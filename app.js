@@ -73,11 +73,11 @@ export function stopSnifferPoll() {
 }
 
 gw.addEventListener('connected', () => {
-  ui.setConnected(true);
-  statePollTimer = setInterval(requestState, 2000);
-  statusPollTimer = setInterval(requestStatus, 2000);
-  requestState();
-  requestStatus();
+    ui.setConnected(true);
+    statePollTimer = setInterval(requestState, 2000);
+    statusPollTimer = setInterval(requestStatus, 2000);
+    requestState();    // <-- subito!
+    requestStatus();   // <-- subito!
 });
 
 gw.addEventListener('disconnected', () => {
