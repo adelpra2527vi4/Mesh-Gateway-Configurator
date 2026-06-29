@@ -1,6 +1,6 @@
 # Mesh Gateway Configurator (PWA)
 
-Configuratore per il gateway BLE Mesh ESP32-S3, sostituisce la vecchia
+Configuratore per il gateway BLE Mesh ESP32-S3, sostituisce la vecchia  
 pagina web servita dal SoftAP. Comunica col gateway via **Web Serial API**
 (USB CDC), protocollo a righe di testo `CFG:` (vedi `serial.js` per il
 dettaglio del parsing).
