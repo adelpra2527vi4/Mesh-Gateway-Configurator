@@ -30,12 +30,15 @@ function pump() {
   const line = cmdQueue.shift();
   const name = cmdNameOf(line);
   cmdInFlight = {
-    name,
-    timer: setTimeout(() => {
-      ui.log(`(timeout: nessuna risposta per ${name})`, 'err');
-      cmdInFlight = null;
-      pump();
-    }, CMD_TIMEOUT_MS),
+      name,
+      timer: setTimeout(() => {
+          ui.log(`(timeout: nessuna risposta per ${name})`, 'err');
+          // reset dei pending in caso di timeout
+          if (name === 'STATE') statePending = false;
+          if (name === 'STATUS') statusPending = false;
+          cmdInFlight = null;
+          pump();
+      }, CMD_TIMEOUT_MS),
   };
   gw.send(line);
 }
