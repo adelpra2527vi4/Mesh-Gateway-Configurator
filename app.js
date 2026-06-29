@@ -49,10 +49,11 @@ function settleInFlight(name) {
 }
 
 function requestState() {
-  if (statePending) return;
-  statePending = true;
-  enqueue('CFG:STATE');
+    if (statePending) return; // bloccato!
+    statePending = true;
+    enqueue('CFG:STATE');
 }
+
 function requestStatus() {
   if (statusPending) return;
   statusPending = true;
