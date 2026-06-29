@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesh Gateway Configurator</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e94560">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="banner-nosupport">
+  Questo configuratore richiede Chrome o Edge. Firefox e Safari non supportano Web Serial.
+</div>
+
+<div class="app">
+  <div class="topbar">
+    <h1>&#128161; Mesh Gateway</h1>
+    <span id="badge-busy" class="badge warn">BUSY</span>
+    <span id="badge-oob" class="badge ok">OOB &#9989;</span>
+    <button id="btn-refresh" class="iconbtn" title="Aggiorna">&#128260;</button>
+    <span><span id="conn-dot" class="dot"></span></span>
+    <button id="btn-connect" class="btn primary">Connetti</button>
+  </div>
+
+  <div id="main-content" class="hidden">
+    <div id="reset-countdown"></div>
+
+    <div id="discovered-box" class="hidden"></div>
+
+    <h2>Nodi configurati</h2>
+    <div id="nodes-box"></div>
+
+    <details open>
+      <summary>Comandi avanzati</summary>
+      <div class="row">
+        <input type="text" id="qr-adddev" class="grow-input" placeholder="QR switch OOB">
+        <button id="btn-adddev" class="btn sm">Registra</button>
+      </div>
+      <div class="row">
+        <button id="btn-scanstart" class="btn sm">Riavvia scansione</button>
+        <button id="btn-clearoob" class="btn sm" disabled>Cancella OOB</button>
+      </div>
+      <div class="row">
+        <button id="btn-reset" class="btn danger sm">RESET COMPLETO RETE</button>
+      </div>
+    </details>
+
+    <div class="row">
+      <span class="muted">Log seriale</span>
+      <button id="btn-clearlog" class="btn sm">Pulisci log</button>
+    </div>
+    <div id="log-panel"></div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+}
+</script>
+</body>
+</html>
