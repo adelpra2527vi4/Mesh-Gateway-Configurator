@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mesh Gateway Configurator</title>
+<title>Mesh Gateway</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#e94560">
+<meta name="theme-color" content="#2fb6a3">
+<script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,45 +14,81 @@
   Questo configuratore richiede Chrome o Edge. Firefox e Safari non supportano Web Serial.
 </div>
 
-<div class="app">
-  <div class="topbar">
-    <h1>&#128161; Mesh Gateway</h1>
-    <span id="badge-busy" class="badge warn">BUSY</span>
-    <span id="badge-oob" class="badge ok">OOB &#9989;</span>
-    <button id="btn-refresh" class="iconbtn" title="Aggiorna">&#128260;</button>
-    <span><span id="conn-dot" class="dot"></span></span>
-    <button id="btn-connect" class="btn primary">Connetti</button>
+<div class="topbar">
+  <div class="brand"><span class="dot" id="conn-dot"></span><h1>Mesh Gateway</h1></div>
+  <span id="badge-busy" class="badge warn" style="display:none">Config...</span>
+  <span id="badge-oob" class="badge good" style="display:none">OOB &#9989;</span>
+  <button id="btn-refresh" class="iconbtn" title="Aggiorna">&#128260;</button>
+  <button id="btn-theme" class="iconbtn" title="Cambia tema">&#9686;</button>
+  <button id="btn-connect" class="btn primary">Connetti</button>
+</div>
+
+<div id="main-content" style="display:none">
+  <div class="tabbar">
+    <button type="button" class="tabbtn active" id="tb-mesh">Mesh</button>
+    <button type="button" class="tabbtn" id="tb-setup">Setup</button>
   </div>
 
-  <div id="main-content" class="hidden">
-    <div id="reset-countdown"></div>
+  <div id="reset-countdown"></div>
+  <div id="banner"></div>
 
-    <div id="discovered-box" class="hidden"></div>
-
-    <h2>Nodi configurati</h2>
+  <!-- ===================== TAB MESH ===================== -->
+  <div id="tab-mesh" class="tabpanel">
+    <div class="stats">
+      <div class="stat"><div class="num" id="st-lamps">&ndash;</div><div class="lbl">Lampade</div></div>
+      <div class="stat"><div class="num" id="st-sens">&ndash;</div><div class="lbl">Sensori</div></div>
+      <div class="stat" id="st-busy-box"><div class="num" id="st-busy">&ndash;</div><div class="lbl">Stato</div></div>
+    </div>
+    <div class="bar">
+      <button id="btn-meshsave" class="btn primary">Salva configurazione mesh</button>
+      <span id="savemsg"></span>
+    </div>
+    <div id="discovered-box"></div>
     <div id="nodes-box"></div>
+    <div class="danger-zone">
+      <button id="btn-reset" class="btn danger">Svuota e resetta rete mesh</button>
+    </div>
+  </div>
+
+  <!-- ===================== TAB SETUP ===================== -->
+  <div id="tab-setup" class="tabpanel hidden">
+    <div class="field">
+      <label>Nome hub</label>
+      <input type="text" id="hubname-input" placeholder="Hub-1">
+      <button id="btn-sethubname" class="btn sm">Salva</button>
+      <span class="muted" id="hubname-msg"></span>
+    </div>
+
+    <h3>Rel&egrave; <span class="muted">&mdash; tocca per accendere/spegnere</span></h3>
+    <div class="relays" id="relays"></div>
+    <p class="muted" style="margin-top:14px">Rel&egrave; abilitati (presenza fisica del carico):</p>
+    <div class="checks" id="relay-checks"></div>
 
     <details open>
-      <summary>Comandi avanzati</summary>
-      <div class="row">
-        <input type="text" id="qr-adddev" class="grow-input" placeholder="QR switch OOB">
-        <button id="btn-adddev" class="btn sm">Registra</button>
-      </div>
-      <div class="row">
-        <button id="btn-scanstart" class="btn sm">Riavvia scansione</button>
-        <button id="btn-clearoob" class="btn sm" disabled>Cancella OOB</button>
-      </div>
-      <div class="row">
-        <button id="btn-reset" class="btn danger sm">RESET COMPLETO RETE</button>
-      </div>
+      <summary>Sniffer BLE (trova mac e payload di un sensore nuovo)</summary>
+      <p>Slot di destinazione:
+        <select id="sniffslot">
+          <option value="0">1</option><option value="1">2</option><option value="2">3</option>
+          <option value="3">4</option><option value="4">5</option><option value="5">6</option>
+          <option value="6">7</option><option value="7">8</option>
+        </select>
+        <button type="button" id="sniffbtn" class="btn sm">Avvia sniffer</button>
+      </p>
+      <p><input type="text" id="sniffsearch" placeholder="Cerca per mac o nome..."></p>
+      <div id="snifflist"><i>Sniffer fermo.</i></div>
     </details>
 
-    <div class="row">
-      <span class="muted">Log seriale</span>
-      <button id="btn-clearlog" class="btn sm">Pulisci log</button>
-    </div>
-    <div id="log-panel"></div>
+    <h3>Sensori BLE classici</h3>
+    <p><button type="button" id="btn-resetallsensors" class="btn danger sm">Pulisci tutti gli slot</button></p>
+    <div id="sensors-live"></div>
+    <div id="sensor-slots"></div>
   </div>
+
+  <details open style="margin-top:20px">
+    <summary>Log seriale</summary>
+    <div class="row" style="margin-bottom:8px"><button id="btn-clearlog" class="btn sm">Pulisci log</button></div>
+    <div id="log-panel"></div>
+  </details>
 </div>
 
 <script type="module" src="app.js"></script>

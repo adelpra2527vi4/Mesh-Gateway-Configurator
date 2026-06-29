@@ -50,10 +50,24 @@ firmware lato gateway implementa il dispatcher in `usb_cfg_handle_line()`
 dentro `main.c` (progetto `provisioner_unified`).
 
 Oltre ai comandi della specifica originale (provisioning/lampade/sensori/
-pairing), il firmware espone anche `CFG:SETHUBNAME`, `CFG:RELAYCFG`,
-`CFG:SENSORCFG`, `CFG:RESETSENSORS`, `CFG:RESETSLOT`, `CFG:MESHSAVE` — non
-nella specifica PWA originale, aggiunti perché senza di loro nome hub, relè
-abilitati e configurazione dei sensori BLE classici non sarebbero più
-raggiungibili da nessuna parte. Questa PWA non ha ancora una UI per quei
-comandi: vanno lanciati a mano dal pannello "Comandi avanzati" componendo
-la riga, oppure aggiungendo una sezione dedicata in un secondo giro.
+pairing), il firmware espone anche un secondo gruppo di comandi pensati per
+replicare la vecchia pagina web del gateway (relè, sensori BLE classici,
+sniffer, nome nodo) — non nella specifica PWA originale, aggiunti per non
+perdere quella funzionalità:
+
+- `CFG:SETNAME` — nome di un nodo mesh (tab Mesh).
+- `CFG:SETHUBNAME`, `CFG:RELAYCFG`, `CFG:SENSORCFG`, `CFG:RESETSENSORS`,
+  `CFG:RESETSLOT`, `CFG:MESHSAVE` — configurazione hub/relè/sensori BLE
+  classici (tab Setup).
+- `CFG:STATUS` (poll separato da `CFG:STATE`, ogni 2s) — stato live relè
+  (`CFG:RELAY`) e sensori BLE classici (`CFG:BLESENSOR`/`CFG:BLERULES`/
+  `CFG:BLELAST`, righe separate perché `rules`/`last` possono contenere `;`).
+- `CFG:RELAYSET` — accende/spegne un relè (stato live, diverso da
+  `CFG:RELAYCFG` che ne cambia solo l'abilitazione).
+- `CFG:SNIFFERSTART`/`CFG:SNIFFERSTOP`/`CFG:SNIFFERDATA` — sniffer BLE
+  classico (tab Setup, poll a 1s mentre attivo): mostra tutti i dispositivi
+  BLE nei dintorni con i byte del payload, evidenziando quelli che cambiano,
+  per scrivere le regole di decodifica di un sensore nuovo.
+
+Vedi `main.c` (progetto `provisioner_unified`) per l'implementazione di
+questi comandi extra.
