@@ -25,8 +25,9 @@ export class GatewaySerial extends EventTarget {
     this.port = await navigator.serial.requestPort();
     await this.port.open({ baudRate: 115200 });
     this.connected = true;
-    this.dispatchEvent(new CustomEvent('connected'));
     this._readLoop();
+    this.dispatchEvent(new CustomEvent('connected'));
+    
   }
 
   async disconnect() {
