@@ -97,8 +97,13 @@ export class GatewaySerial extends EventTarget {
   }
 
   _onLine(line) {
-    this.dispatchEvent(new CustomEvent('line', { detail: line }));
-
+    // Le righe di CORPO dei blocchi CFG:STATE/STATUS/SNIFF (decine ogni 2s,
+    // poll automatico) e i loro marcatori START/END NON vengono piu' mandate
+    // sull'evento 'line' (quindi non finiscono nel pannello "Log seriale"):
+    // sono gia' interpretate strutturalmente (eventi 'state'/'status'/
+    // 'sniffer') e il rumore rendeva impossibile vedere a occhio le righe che
+    // contano davvero (DBG;, CFG:OK/ERR, comandi mandati, push) durante un
+    // provisioning che richiede minuti - vedi conversazione.
     if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] }; this._armTimer(); return; }
     if (line === 'CFG:STATE_END') {
       this._clearBlockTimer();
@@ -124,6 +129,10 @@ export class GatewaySerial extends EventTarget {
     if (this._stateAcc && line.startsWith('CFG:')) { this._accumulateState(line); return; }
     if (this._statusAcc && line.startsWith('CFG:')) { this._accumulateStatus(line); return; }
     if (this._sniffAcc && line.startsWith('CFG:SNIFFDEV;')) { this._accumulateSniff(line); return; }
+
+    // Da qui in poi: righe "interessanti" (non corpo di un blocco) - queste
+    // SI vedono nel log.
+    this.dispatchEvent(new CustomEvent('line', { detail: line }));
 
     if (line.startsWith('CFG:OK;') || line.startsWith('CFG:ERR;') || line.startsWith('CFG:BUSY;')) {
       this._onResult(line);
