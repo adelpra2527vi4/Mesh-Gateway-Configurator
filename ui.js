@@ -197,18 +197,30 @@ function renderDiscovered() {
     const locked = lastState.busy; // provisioning di un altro nodo in corso: tutta la lista in grigio, non cliccabile
     const canProv = !locked && (!d.oob || lastState.oob);
     const oobTag = d.oob ? `<span class="badge warn">OOB</span>` : `<span class="badge">No OOB</span>`;
+    // Il firmware riconosce l'UUID (fisso di fabbrica) confrontandolo con
+    // quelli dei nodi gia' provisionati: se combacia, questo "nuovo"
+    // dispositivo scoperto e' in realta' un nodo gia' configurato che e'
+    // caduto dalla mesh (es. si e' resettato) - vedi conversazione, prima
+    // sembrava che un nodo sparisse/si sostituisse a sorpresa.
+    const knownTag = d.known
+      ? `<span class="badge warn">Gia' noto${d.knownName ? (': ' + d.knownName) : ''}</span>`
+      : '';
     const btn = locked
       ? `<span class="pill wait">Provisioning...</span>`
       : (canProv
-          ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}">Provisiona</button>`
+          ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}" data-known="${d.known?1:0}" data-knownname="${d.knownName||''}">Provisiona</button>`
           : `<span class="muted">(Registra prima il QR OOB)</span>`);
     return `<div class="dev-card${locked ? ' usb-locked' : ''}"><div class="grow">
         <div style="font-family:ui-monospace,monospace;font-weight:600">${d.addr} <span class="rssi">${d.rssi||0} dBm</span></div>
-        <div style="margin-top:3px">${oobTag} <span class="addr">UUID ${d.uuid.slice(0,8)}...</span></div>
+        <div style="margin-top:3px">${oobTag} ${knownTag} <span class="addr">UUID ${d.uuid.slice(0,8)}...</span></div>
       </div>${btn}</div>`;
   }).join('');
   box.querySelectorAll('[data-act="provision"]').forEach(b => {
     b.addEventListener('click', () => {
+      if (b.dataset.known === '1') {
+        const name = b.dataset.knownname || '(senza nome)';
+        if (!confirm(`Questo dispositivo sembra gia' configurato come "${name}" ed e' caduto dalla rete mesh.\n\nRiprovisionarlo lo riconfigurera' da zero (gruppo/nome restano, ma andra' ribindato). Continuare?`)) return;
+      }
       const d = list.find(x => x.uuid === b.dataset.uuid);
       if (d) provisioningDevice = d;
       api.sendCmd('CFG:PROVISION;uuid=' + b.dataset.uuid);

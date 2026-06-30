@@ -190,7 +190,10 @@ export class GatewaySerial extends EventTarget {
         break;
       }
       case 'DISCOVERED':
-        st.discovered.push({ uuid: fields.uuid, addr: fields.addr, rssi: parseInt(fields.rssi, 10), oob: fields.oob === '1' });
+        st.discovered.push({
+          uuid: fields.uuid, addr: fields.addr, rssi: parseInt(fields.rssi, 10), oob: fields.oob === '1',
+          known: fields.known === '1', knownName: fields.knownname || '',
+        });
         break;
       default: break;
     }
