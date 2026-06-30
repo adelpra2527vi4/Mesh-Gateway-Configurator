@@ -251,7 +251,12 @@ function renderNode(nd) {
       </div>${warn}</div>`;
   }
 
-  let cards = `<div class="cards">`;
+  // Mentre lastState.busy e' true (provisioning/config di un nodo in corso,
+  // vedi gateway_is_provisioning() lato firmware che ora blocca anche
+  // CFG:CMD/CFG:LEVEL) blocchiamo qui i controlli sugli ALTRI nodi gia'
+  // configurati, cosi' l'utente non manda comandi che il firmware
+  // rifiuterebbe comunque con CFG:ERR.
+  let cards = `<div class="cards${lastState.busy ? ' usb-locked' : ''}">`;
   for (const el of nd.elems) {
     cards += `<div class="card"><div class="elem-title">Elemento #${el.e}<span class="pill ${el.on?'on':'off'}">${el.on?'Acceso':'Spento'}</span></div>
       <span class="addr">${el.addr}</span>
