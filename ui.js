@@ -4,7 +4,7 @@
 // protocollo a righe CFG: invece che su fetch+JSON.
 
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
-let lastState  = { busy: false, oob: false, nodes: [], discovered: [] };
+let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] };
 let lastStatus = { relays: [], blesensors: [] };
 let logLines = 0;
 const LOG_MAX = 500;
@@ -57,7 +57,7 @@ export function setConnected(connected) {
   dot.classList.toggle('on', connected);
   document.getElementById('main-content').style.display = connected ? '' : 'none';
   if (!connected) {
-    lastState = { busy: false, oob: false, nodes: [], discovered: [] };
+    lastState = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] };
     lastStatus = { relays: [], blesensors: [] };
     snifferOn = false;
   }
@@ -100,7 +100,42 @@ function startResetCountdown() {
 // ============================================================
 // TAB MESH
 // ============================================================
-export function renderState(state) { lastState = state; renderMesh(); }
+export function renderState(state) { lastState = state; renderUsbModeBanner(state.usbMode); renderMesh(); }
+
+// Punto 1 della richiesta: il device di default e' in modalita' "normale"
+// (solo MQTT) - i comandi di scrittura/scan/provisioning sono rifiutati dal
+// firmware finche' non si tiene premuto BOOT per qualche secondo (vedi
+// CFG:ERR;.../"modalita' USB non attiva" in main.c). Qui mostriamo un
+// banner e disabilitiamo i pulsanti che lancerebbero comandi di scrittura,
+// cosi' l'utente capisce perche' non succede nulla invece di vedere solo
+// errori in log.
+const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn'];
+
+function renderUsbModeBanner(usbMode) {
+  const banner = document.getElementById('banner');
+  if (banner) {
+    if (!usbMode) {
+      banner.textContent = 'Device in modalita\' MQTT: tieni premuto il pulsante BOOT sul gateway per qualche secondo per attivare la modalita\' USB e abilitare scan/provisioning/relè.';
+      banner.style.display = 'block'; // #banner ha gia' il suo stile (rosso/border) in style.css
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+  for (const id of WRITE_BTN_IDS) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !usbMode;
+  }
+  // I controlli per-nodo (provisiona/rebind/forget/onoff/livello/pair/relè/
+  // sniffer) sono rigenerati a ogni renderMesh()/renderNodes()/render* e non
+  // hanno un id fisso da disabilitare uno per uno: la classe "usb-locked"
+  // sui contenitori principali li disattiva tutti via CSS (pointer-events
+  // none + opacita' ridotta), il firmware li rifiuta comunque con CFG:ERR
+  // se per qualche motivo arrivano lo stesso (vedi usb_cfg_handle_line).
+  for (const id of ['discovered-box', 'nodes-box', 'tab-setup']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('usb-locked', !usbMode);
+  }
+}
 
 export function applyPush(detail) {
   if (detail.type === 'DUMPEND') return;

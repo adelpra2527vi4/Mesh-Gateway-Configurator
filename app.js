@@ -30,15 +30,12 @@ function pump() {
   const line = cmdQueue.shift();
   const name = cmdNameOf(line);
   cmdInFlight = {
-      name,
-      timer: setTimeout(() => {
-          ui.log(`(timeout: nessuna risposta per ${name})`, 'err');
-          // reset dei pending in caso di timeout
-          if (name === 'STATE') statePending = false;
-          if (name === 'STATUS') statusPending = false;
-          cmdInFlight = null;
-          pump();
-      }, CMD_TIMEOUT_MS),
+    name,
+    timer: setTimeout(() => {
+      ui.log(`(timeout: nessuna risposta per ${name})`, 'err');
+      cmdInFlight = null;
+      pump();
+    }, CMD_TIMEOUT_MS),
   };
   gw.send(line);
 }
@@ -52,11 +49,10 @@ function settleInFlight(name) {
 }
 
 function requestState() {
-    if (statePending) return; // bloccato!
-    statePending = true;
-    enqueue('CFG:STATE');
+  if (statePending) return;
+  statePending = true;
+  enqueue('CFG:STATE');
 }
-
 function requestStatus() {
   if (statusPending) return;
   statusPending = true;
@@ -77,11 +73,11 @@ export function stopSnifferPoll() {
 }
 
 gw.addEventListener('connected', () => {
-    ui.setConnected(true);
-    statePollTimer = setInterval(requestState, 2000);
-    statusPollTimer = setInterval(requestStatus, 2000);
-    requestState();    // <-- subito!
-    requestStatus();   // <-- subito!
+  ui.setConnected(true);
+  statePollTimer = setInterval(requestState, 2000);
+  statusPollTimer = setInterval(requestStatus, 2000);
+  requestState();
+  requestStatus();
 });
 
 gw.addEventListener('disconnected', () => {

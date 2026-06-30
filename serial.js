@@ -25,9 +25,8 @@ export class GatewaySerial extends EventTarget {
     this.port = await navigator.serial.requestPort();
     await this.port.open({ baudRate: 115200 });
     this.connected = true;
-    this._readLoop();
     this.dispatchEvent(new CustomEvent('connected'));
-    
+    this._readLoop();
   }
 
   async disconnect() {
@@ -100,7 +99,7 @@ export class GatewaySerial extends EventTarget {
   _onLine(line) {
     this.dispatchEvent(new CustomEvent('line', { detail: line }));
 
-    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, nodes: [], discovered: [] }; this._armTimer(); return; }
+    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] }; this._armTimer(); return; }
     if (line === 'CFG:STATE_END') {
       this._clearBlockTimer();
       const st = this._stateAcc; this._stateAcc = null;
@@ -155,6 +154,7 @@ export class GatewaySerial extends EventTarget {
     switch (type) {
       case 'BUSY': st.busy = line === 'CFG:BUSY;true'; break;
       case 'OOB':  st.oob  = line === 'CFG:OOB;true'; break;
+      case 'USBMODE': st.usbMode = fields.active === 'true'; break;
       case 'NODE': {
         st.nodes.push({
           i: parseInt(fields.i, 10), base: fields.base,

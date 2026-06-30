@@ -61,6 +61,11 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .badge.good{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,var(--border))}
 .badge.warn{color:var(--yellow);border-color:color-mix(in srgb,var(--yellow) 45%,var(--border))}
 
+/* Modalita' USB non attiva (vedi ui.js renderUsbModeBanner): blocca i
+   controlli interattivi dentro i contenitori marcati, il device li
+   rifiuterebbe comunque ma cosi' e' chiaro all'utente perche'. */
+.usb-locked{opacity:.5;pointer-events:none}
+
 .name-input{font-size:1rem;font-weight:700;border:1px solid transparent;border-radius:8px;padding:5px 8px;width:160px;max-width:48vw;background:transparent;color:var(--text)}
 .name-input:hover{border-color:var(--border)}
 .name-input:focus{border-color:var(--accent);background:var(--surface);outline:none}
