@@ -60,6 +60,7 @@ export function setConnected(connected) {
     lastState = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] };
     lastStatus = { relays: [], blesensors: [] };
     snifferOn = false;
+    provisioningDevice = null;
   }
 }
 
@@ -173,23 +174,45 @@ function renderMesh() {
   renderNodes();
 }
 
+// Il dispositivo che si sta provisionando viene tolto SUBITO da discovered[]
+// lato firmware (cfg_provision) ma entra in nodes[] solo a provisioning
+// completato: per qualche secondo non e' in nessuna delle due liste. Lo
+// teniamo in memoria qui lato client cosi' possiamo continuare a mostrarlo
+// (in grigio, non cliccabile) invece di farlo sparire del tutto.
+let provisioningDevice = null;
+
 function renderDiscovered() {
   const box = document.getElementById('discovered-box');
-  const list = lastState.discovered || [];
+  let list = lastState.discovered || [];
+
+  if (!lastState.busy) {
+    provisioningDevice = null;
+  } else if (provisioningDevice && !list.some(d => d.uuid === provisioningDevice.uuid)) {
+    list = [...list, provisioningDevice];
+  }
+
   if (list.length === 0) { box.innerHTML = ''; return; }
+
   box.innerHTML = '<div class="section-title">Dispositivi rilevati</div>' + list.map(d => {
-    const canProv = !d.oob || lastState.oob;
+    const locked = lastState.busy; // provisioning di un altro nodo in corso: tutta la lista in grigio, non cliccabile
+    const canProv = !locked && (!d.oob || lastState.oob);
     const oobTag = d.oob ? `<span class="badge warn">OOB</span>` : `<span class="badge">No OOB</span>`;
-    const btn = canProv
-      ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}">Provisiona</button>`
-      : `<span class="muted">(Registra prima il QR OOB)</span>`;
-    return `<div class="dev-card"><div class="grow">
+    const btn = locked
+      ? `<span class="pill wait">Provisioning...</span>`
+      : (canProv
+          ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}">Provisiona</button>`
+          : `<span class="muted">(Registra prima il QR OOB)</span>`);
+    return `<div class="dev-card${locked ? ' usb-locked' : ''}"><div class="grow">
         <div style="font-family:ui-monospace,monospace;font-weight:600">${d.addr} <span class="rssi">${d.rssi||0} dBm</span></div>
         <div style="margin-top:3px">${oobTag} <span class="addr">UUID ${d.uuid.slice(0,8)}...</span></div>
       </div>${btn}</div>`;
   }).join('');
   box.querySelectorAll('[data-act="provision"]').forEach(b => {
-    b.addEventListener('click', () => api.sendCmd('CFG:PROVISION;uuid=' + b.dataset.uuid));
+    b.addEventListener('click', () => {
+      const d = list.find(x => x.uuid === b.dataset.uuid);
+      if (d) provisioningDevice = d;
+      api.sendCmd('CFG:PROVISION;uuid=' + b.dataset.uuid);
+    });
   });
 }
 
