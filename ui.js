@@ -5,6 +5,9 @@
 
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
 let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] };
+
+// Usato da app.js per rallentare il polling durante il provisioning.
+export function getLastStateBusy() { return !!lastState.busy; }
 let lastStatus = { relays: [], blesensors: [] };
 let logLines = 0;
 const LOG_MAX = 500;
@@ -371,6 +374,16 @@ export function renderStatus(status) {
 
   renderRelays();
   renderSensorSlots();
+}
+
+export function onCmdResult(type, cmd) {
+  if (cmd === 'MESHSAVE') {
+    const m = document.getElementById('savemsg');
+    if (m) m.textContent = type === 'OK' ? 'Salvato' : '';
+  } else if (cmd === 'SETHUBNAME') {
+    const m = document.getElementById('hubname-msg');
+    if (m) m.textContent = type === 'OK' ? 'Salvato' : '';
+  }
 }
 
 function renderRelays() {

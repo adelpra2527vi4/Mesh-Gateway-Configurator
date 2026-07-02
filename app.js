@@ -33,6 +33,7 @@ function pump() {
     name,
     timer: setTimeout(() => {
       ui.log(`(timeout: nessuna risposta per ${name})`, 'err');
+      ui.onCmdResult('TIMEOUT', name);
       cmdInFlight = null;
       pump();
     }, CMD_TIMEOUT_MS),
@@ -74,8 +75,20 @@ export function stopSnifferPoll() {
 
 gw.addEventListener('connected', () => {
   ui.setConnected(true);
-  statePollTimer = setInterval(requestState, 2000);
-  statusPollTimer = setInterval(requestStatus, 2000);
+  // Durante il provisioning (lastState.busy) il radio BLE e' interamente
+  // dedicato alla config del nuovo nodo: inviare CFG:STATE/CFG:STATUS ogni 2s
+  // aggiunge traffico USB e porta il firmware a rispondere con decine di righe
+  // che competono con i log di debug e i retry di config. Si rallenta a 10s
+  // quando busy, si torna a 2s appena il gateway torna libero.
+  statePollTimer = setInterval(() => {
+    const isBusy = ui.getLastStateBusy();
+    if (!isBusy) requestState();
+  }, 2000);
+  statusPollTimer = setInterval(() => {
+    const isBusy = ui.getLastStateBusy();
+    if (!isBusy) requestStatus();
+  }, 2000);
+  // Poll iniziale sempre, poi si adatta
   requestState();
   requestStatus();
 });
@@ -114,6 +127,7 @@ gw.addEventListener('sniffer', (e) => {
 gw.addEventListener('result', (e) => {
   const { type, cmd, msg } = e.detail;
   settleInFlight(cmd);
+  ui.onCmdResult(type, cmd);
   if (type === 'ERR') ui.log(`CFG:ERR;${cmd};${msg}`, 'err');
   if (type === 'BUSY') ui.log(`CFG:BUSY;${cmd}`, 'err');
   if (type === 'OK' && cmd !== 'STATE' && cmd !== 'STATUS' && cmd !== 'SNIFFERDATA' && cmd !== 'RESET') {
