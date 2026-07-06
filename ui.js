@@ -498,7 +498,16 @@ function renderByteRow(mac, type, id, hex) {
 }
 
 export function renderSniffer(devs) {
-  lastSniffDevs = devs;
+  // Merge: aggiorna i device già visti, aggiunge quelli nuovi,
+  // non rimuove mai nulla — la lista cresce solo, non si azzera tra un poll e l'altro.
+  devs.forEach(d => {
+    const idx = lastSniffDevs.findIndex(x => x.mac === d.mac);
+    if (idx >= 0) {
+      lastSniffDevs[idx] = d; // aggiorna rssi e payload se cambiano
+    } else {
+      lastSniffDevs.push(d);
+    }
+  });
   renderSnifferList();
 }
 
