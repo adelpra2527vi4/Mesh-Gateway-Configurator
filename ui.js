@@ -539,7 +539,7 @@ function renderSnifferList() {
     b.addEventListener('click', () => {
       const slot = document.getElementById('sniffslot').value;
       const m = document.getElementById('bm_' + slot);
-      if (m) m.value = b.dataset.mac;
+      if (m) { m.value = b.dataset.mac; m.focus(); } // focus: blocca il ridisegno del campo al prossimo refresh di stato
     });
   });
   list.querySelectorAll('[data-act="copymac"]').forEach(b => {
