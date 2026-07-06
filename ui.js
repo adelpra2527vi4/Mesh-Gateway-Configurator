@@ -516,10 +516,13 @@ function renderSnifferList() {
   const base = pinnedMac ? lastSniffDevs.filter(d => d.mac === pinnedMac) : lastSniffDevs;
   const filtered = q ? base.filter(d => d.mac.toUpperCase().includes(q) || (d.name && d.name.toUpperCase().includes(q))) : base;
 
-  // Banner di stato: mostrato quando lo sniffer è fermo ma c'è ancora una lista
-  let h = !snifferOn && lastSniffDevs.length > 0
-    ? '<p style="margin:0 0 8px;opacity:.6;font-size:.85em"><i>Sniffer fermo — lista congelata. Premi "Pulisci lista" per azzerarla.</i></p>'
-    : '';
+  const total = lastSniffDevs.length;
+  const statusLine = snifferOn
+    ? `<span style="font-size:.85em;opacity:.7">${total} dispositivi in memoria${q || pinnedMac ? ` (${filtered.length} visibili)` : ''}</span>`
+    : total > 0
+      ? `<span style="font-size:.85em;opacity:.6"><i>Sniffer fermo — ${total} dispositivi congelati. "Pulisci lista" per azzerare.</i></span>`
+      : '';
+  let h = statusLine ? `<p style="margin:0 0 8px">${statusLine}</p>` : '';
   filtered.forEach(d => {
     h += `<div class="dev-card"><div><b>${d.mac}</b> ${d.name?('('+d.name+')'):''} - ${d.rssi} dBm
         <button type="button" data-act="usemac" data-mac="${d.mac}">Usa MAC</button>
