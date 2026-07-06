@@ -43,6 +43,11 @@ export function init(a) {
     api.sendCmd('CFG:RESETSENSORS');
   });
   document.getElementById('sniffbtn').addEventListener('click', toggleSniffer);
+  document.getElementById('sniffclearbtn').addEventListener('click', () => {
+    lastSniffDevs = [];
+    pinnedMac = null; everChanged = {}; prevHex = {};
+    renderSnifferList();
+  });
   document.getElementById('sniffsearch').addEventListener('input', () => renderSnifferList());
 }
 
@@ -469,7 +474,7 @@ function toggleSniffer() {
     snifferOn = false;
     btn.textContent = 'Avvia sniffer';
     api.stopSnifferPoll();
-    document.getElementById('snifflist').innerHTML = '<i>Sniffer fermo.</i>';
+    renderSnifferList(); // mantiene la lista, aggiunge indicatore "congelata"
   }
 }
 
@@ -502,7 +507,10 @@ function renderSnifferList() {
   const base = pinnedMac ? lastSniffDevs.filter(d => d.mac === pinnedMac) : lastSniffDevs;
   const filtered = q ? base.filter(d => d.mac.toUpperCase().includes(q) || (d.name && d.name.toUpperCase().includes(q))) : base;
 
-  let h = '';
+  // Banner di stato: mostrato quando lo sniffer è fermo ma c'è ancora una lista
+  let h = !snifferOn && lastSniffDevs.length > 0
+    ? '<p style="margin:0 0 8px;opacity:.6;font-size:.85em"><i>Sniffer fermo — lista congelata. Premi "Pulisci lista" per azzerarla.</i></p>'
+    : '';
   filtered.forEach(d => {
     h += `<div class="dev-card"><div><b>${d.mac}</b> ${d.name?('('+d.name+')'):''} - ${d.rssi} dBm
         <button type="button" data-act="usemac" data-mac="${d.mac}">Usa MAC</button>
