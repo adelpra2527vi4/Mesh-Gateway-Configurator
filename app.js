@@ -146,8 +146,10 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
 });
 document.getElementById('btn-refresh').addEventListener('click', () => {
   const btn = document.getElementById('btn-refresh');
+  btn.classList.remove('spinning');
+  void btn.offsetWidth; // forza reflow: riavvia l'animazione anche se già attiva
   btn.classList.add('spinning');
-  btn.addEventListener('animationend', () => btn.classList.remove('spinning'), { once: true });
+  setTimeout(() => btn.classList.remove('spinning'), 600);
   requestState(); requestStatus();
 });
 document.getElementById('btn-clearlog').addEventListener('click', () => ui.clearLog());
