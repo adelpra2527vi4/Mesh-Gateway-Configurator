@@ -12,6 +12,9 @@ let lastStatus = { relays: [], blesensors: [] };
 let logLines = 0;
 const LOG_MAX = 500;
 
+// --- Slot sensori: flag "modificato dall'utente, non ridisegnare" ---
+let sensorSlotsDirty = false;
+
 // --- Sniffer: stato lato client (byte evidenziati, dispositivo isolato) ---
 let snifferOn = false;
 let lastSniffDevs = [];
@@ -423,9 +426,10 @@ function renderSensorSlots() {
   ).join('');
   liveBox.innerHTML = liveHtml || '<i class="muted">Nessun sensore configurato</i>';
 
-  // I campi di editing (mac/regole/nome): non li ridisegno se l'utente ci sta
-  // scrivendo dentro (stesso problema/fix del nome nodo nella mesh).
-  if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#sensor-slots')) return;
+  // Non ridisegnare i campi se l'utente li ha modificati ma non ancora salvato:
+  // il ridisegno sovrascrive i valori appena scritti (da "Usa MAC", "Usa regola"
+  // o digitazione diretta). Il flag viene azzerato solo su Salva/Elimina.
+  if (sensorSlotsDirty) return;
 
   const box = document.getElementById('sensor-slots');
   let h = '';
@@ -439,8 +443,11 @@ function renderSensorSlots() {
       <button type="button" class="btn danger sm" data-act="sensorreset" data-slot="${i}">Elimina</button></div>`;
   }
   box.innerHTML = h;
+  // Qualsiasi digitazione nei campi attiva il flag "dirty"
+  box.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { sensorSlotsDirty = true; }));
   box.querySelectorAll('[data-act="sensorsave"]').forEach(b => {
     b.addEventListener('click', () => {
+      sensorSlotsDirty = false; // permette il ridisegno con i nuovi dati dall'ESP
       const i = b.dataset.slot;
       const mac = document.getElementById('bm_' + i).value.trim();
       const rules = document.getElementById('bg_' + i).value.trim();
@@ -452,6 +459,7 @@ function renderSensorSlots() {
   box.querySelectorAll('[data-act="sensorreset"]').forEach(b => {
     b.addEventListener('click', () => {
       if (!confirm(`Svuotare lo slot ${parseInt(b.dataset.slot)+1}?`)) return;
+      sensorSlotsDirty = false;
       api.sendCmd(`CFG:RESETSLOT;slot=${b.dataset.slot}`);
       api.afterStatusRefresh();
     });
@@ -523,7 +531,8 @@ function renderSnifferList() {
       ? `<span style="font-size:.85em;opacity:.6"><i>Sniffer fermo — ${total} dispositivi congelati. "Pulisci lista" per azzerare.</i></span>`
       : '';
   let h = statusLine ? `<p style="margin:0 0 8px">${statusLine}</p>` : '';
-  filtered.forEach(d => {
+  const sorted = [...filtered].sort((a, b) => b.rssi - a.rssi); // dal più vicino al più lontano
+  sorted.forEach(d => {
     h += `<div class="dev-card"><div><b>${d.mac}</b> ${d.name?('('+d.name+')'):''} - ${d.rssi} dBm
         <button type="button" data-act="usemac" data-mac="${d.mac}">Usa MAC</button>
         <button type="button" data-act="copymac" data-mac="${d.mac}">Copia MAC</button>
@@ -539,7 +548,7 @@ function renderSnifferList() {
     b.addEventListener('click', () => {
       const slot = document.getElementById('sniffslot').value;
       const m = document.getElementById('bm_' + slot);
-      if (m) { m.value = b.dataset.mac; m.focus(); } // focus: blocca il ridisegno del campo al prossimo refresh di stato
+      if (m) { sensorSlotsDirty = true; m.value = b.dataset.mac; m.focus(); }
     });
   });
   list.querySelectorAll('[data-act="copymac"]').forEach(b => {
@@ -560,7 +569,7 @@ function renderSnifferList() {
       const rule = `${b.dataset.type},${b.dataset.id},${b.dataset.off},1,1,${label}`;
       const slot = document.getElementById('sniffslot').value;
       const g = document.getElementById('bg_' + slot);
-      if (g) g.value = g.value ? g.value + ';' + rule : rule;
+      if (g) { sensorSlotsDirty = true; g.value = g.value ? g.value + ';' + rule : rule; g.focus(); }
     });
   });
 }
