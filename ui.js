@@ -266,15 +266,22 @@ function renderNodes() {
   // faceva la vecchia pagina (altrimenti il refresh ogni 2s cancella quello
   // che si sta scrivendo).
   const act = document.activeElement;
-  let editingId = null, editingVal = null;
-  if (act && act.id && box.contains(act)) { editingId = act.id; editingVal = act.value; }
+  let editingId = null, editingVal = null, editingSel = null;
+  if (act && act.id && box.contains(act)) {
+    editingId = act.id; editingVal = act.value;
+    try { editingSel = [act.selectionStart, act.selectionEnd]; } catch {}
+  }
 
   box.innerHTML = lastState.nodes.map(renderNode).join('');
   wireNodeEvents(box);
 
   if (editingId) {
     const el = document.getElementById(editingId);
-    if (el) { el.value = editingVal; el.focus(); }
+    if (el) {
+      el.value = editingVal;
+      el.focus();
+      if (editingSel) try { el.setSelectionRange(editingSel[0], editingSel[1]); } catch {}
+    }
   }
 }
 
