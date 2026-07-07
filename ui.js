@@ -321,6 +321,8 @@ function renderNode(nd) {
       ? `<span class="muted" style="font-size:0.84em">Zero: ${(calib.dark_cl/100).toFixed(2)} lux</span>`
       : '';
     const usbLock = !lastState.usbMode ? ' usb-locked' : '';
+    // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
+    const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
 
     const calibCard = `<div class="card${usbLock}" style="margin-top:10px">
       <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
@@ -339,7 +341,7 @@ function renderNode(nd) {
       <div style="margin:8px 0">
         <strong>2.</strong> Scopri il sensore sotto illuminazione nota &mdash;
         inserisci i lux del sensore di riferimento:
-        <input type="number" id="cref-${nd.i}" min="1" step="1" style="width:80px;margin:0 4px" value="${calib?.ref_lux||''}"> lux
+        <input type="number" id="cref-${nd.i}" min="1" step="1" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
         <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra e invia</button>
         <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
       </div>
