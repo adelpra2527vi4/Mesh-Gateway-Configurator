@@ -268,6 +268,9 @@ function renderNodes() {
   const act = document.activeElement;
   let editingId = null, editingVal = null, editingSel = null;
   if (act && act.id && box.contains(act)) {
+    // Se l'utente sta scrivendo in un campo che non sia il nome nodo,
+    // salta il re-render per non disturbare il cursore.
+    if (!act.id.startsWith('nm_')) return;
     editingId = act.id; editingVal = act.value;
     try { editingSel = [act.selectionStart, act.selectionEnd]; } catch {}
   }
