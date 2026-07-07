@@ -267,7 +267,7 @@ function renderNodes() {
   // che si sta scrivendo).
   const act = document.activeElement;
   let editingId = null, editingVal = null;
-  if (act && act.id && act.id.indexOf('nm_') === 0) { editingId = act.id; editingVal = act.value; }
+  if (act && act.id && box.contains(act)) { editingId = act.id; editingVal = act.value; }
 
   box.innerHTML = lastState.nodes.map(renderNode).join('');
   wireNodeEvents(box);
