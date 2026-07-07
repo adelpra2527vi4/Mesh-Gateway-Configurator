@@ -352,7 +352,7 @@ function renderNode(nd) {
       <div style="margin:8px 0">
         <strong>2.</strong> Scopri il sensore sotto illuminazione nota &mdash;
         inserisci i lux del sensore di riferimento:
-        <input type="number" id="cref-${nd.i}" min="1" step="1" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
+        <input type="text" inputmode="numeric" id="cref-${nd.i}" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
         <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra e invia</button>
         <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
       </div>
