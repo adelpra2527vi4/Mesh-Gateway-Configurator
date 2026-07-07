@@ -280,7 +280,11 @@ function renderNodes() {
     if (el) {
       el.value = editingVal;
       el.focus();
-      if (editingSel) try { el.setSelectionRange(editingSel[0], editingSel[1]); } catch {}
+      try {
+        const s = editingSel ? editingSel[0] : editingVal.length;
+        const e = editingSel ? editingSel[1] : editingVal.length;
+        el.setSelectionRange(s, e);
+      } catch {}
     }
   }
 }
