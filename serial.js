@@ -193,7 +193,7 @@ export class GatewaySerial extends EventTarget {
         st.discovered.push({
           uuid: fields.uuid, addr: fields.addr, rssi: parseInt(fields.rssi, 10), oob: fields.oob === '1',
           known: fields.known === '1', knownName: fields.knownname || '',
-          name: fields.name || '',
+          name: fields.name || '', // nome BLE (AD 0x09) catturato dallo scan attivo
         });
         break;
       default: break;

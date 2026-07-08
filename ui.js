@@ -6,22 +6,11 @@
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
 let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] };
 
-// Calibrazione lux: rawLux live per nodo (aggiornato dai push SENSOR)
-let luxRawLive = {}; // { nodeI: float }
-
-function loadLuxCalib() { try { return JSON.parse(localStorage.getItem('lux_calib') || '{}'); } catch { return {}; } }
-function saveLuxCalib(d) { localStorage.setItem('lux_calib', JSON.stringify(d)); }
-function getNodeCalib(nodeI) { return loadLuxCalib()[String(nodeI)] || null; }
-function clearNodeCalib(nodeI) { const a = loadLuxCalib(); delete a[String(nodeI)]; saveLuxCalib(a); }
-
 // Usato da app.js per rallentare il polling durante il provisioning.
 export function getLastStateBusy() { return !!lastState.busy; }
 let lastStatus = { relays: [], blesensors: [] };
 let logLines = 0;
 const LOG_MAX = 500;
-
-// --- Slot sensori: flag "modificato dall'utente, non ridisegnare" ---
-let sensorSlotsDirty = false;
 
 // --- Sniffer: stato lato client (byte evidenziati, dispositivo isolato) ---
 let snifferOn = false;
@@ -53,13 +42,7 @@ export function init(a) {
     if (!confirm('Cancellare tutti i sensori BLE classici configurati?')) return;
     api.sendCmd('CFG:RESETSENSORS');
   });
-
   document.getElementById('sniffbtn').addEventListener('click', toggleSniffer);
-  document.getElementById('sniffclearbtn').addEventListener('click', () => {
-    lastSniffDevs = [];
-    pinnedMac = null; everChanged = {}; prevHex = {};
-    renderSnifferList();
-  });
   document.getElementById('sniffsearch').addEventListener('input', () => renderSnifferList());
 }
 
@@ -121,16 +104,7 @@ function startResetCountdown() {
 // ============================================================
 // TAB MESH
 // ============================================================
-export function renderState(state) {
-  // Popola luxRawLive dai dati SENSOR_DATA nell'aggiornamento di stato
-  // (backup per quando non sono ancora arrivati push SENSOR)
-  for (const nd of (state.nodes || [])) {
-    if (nd.kind === 1 && nd.sensor && nd.sensor.light >= 0) {
-      if (luxRawLive[nd.i] === undefined) luxRawLive[nd.i] = nd.sensor.light / 100;
-    }
-  }
-  lastState = state; renderUsbModeBanner(state.usbMode); renderMesh();
-}
+export function renderState(state) { lastState = state; renderUsbModeBanner(state.usbMode); renderMesh(); }
 
 // Punto 1 della richiesta: il device di default e' in modalita' "normale"
 // (solo MQTT) - i comandi di scrittura/scan/provisioning sono rifiutati dal
@@ -182,7 +156,6 @@ export function applyPush(detail) {
       if (node.base && node.base.toLowerCase() === addrHex && node.sensor) {
         node.sensor.pres = detail.presence ? 1 : 0;
         node.sensor.light = detail.lux >= 0 ? Math.round(detail.lux * 100) : -1;
-        if (detail.lux >= 0) luxRawLive[node.i] = detail.lux;  // per il wizard di calibrazione
         renderMesh();
         return;
       }
@@ -240,11 +213,12 @@ function renderDiscovered() {
       : (canProv
           ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}" data-known="${d.known?1:0}" data-knownname="${d.knownName||''}">Provisiona</button>`
           : `<span class="muted">(Registra prima il QR OOB)</span>`);
-    const macFmt = d.addr ? d.addr.replace(/(.{2})(?=.)/g, '$1:').toUpperCase() : d.addr;
-    const nameStr = d.name ? `<span style="font-weight:400;margin-left:6px;opacity:.85">${d.name}</span>` : '';
+    const deviceName = d.name || (d.known && d.knownName ? d.knownName : '');
+    const nameRow = deviceName ? `<div style="margin-top:2px;font-size:.85em;color:var(--text-muted,#aaa)">${deviceName}</div>` : '';
     return `<div class="dev-card${locked ? ' usb-locked' : ''}"><div class="grow">
-        <div style="font-family:ui-monospace,monospace;font-weight:600">${macFmt}${nameStr} <span class="rssi">${d.rssi||0} dBm</span></div>
+        <div style="font-family:ui-monospace,monospace;font-weight:600">${d.addr} <span class="rssi">${d.rssi||0} dBm</span></div>
         <div style="margin-top:3px">${oobTag} ${knownTag} <span class="addr">UUID ${d.uuid.slice(0,8)}...</span></div>
+        ${nameRow}
       </div>${btn}</div>`;
   }).join('');
   box.querySelectorAll('[data-act="provision"]').forEach(b => {
@@ -264,17 +238,14 @@ function renderNodes() {
   const box = document.getElementById('nodes-box');
   if (!lastState.nodes.length) { box.innerHTML = "<div class='empty'>In attesa di dispositivi...</div>"; return; }
 
-  // Preserva il focus/valore di un eventuale input nome in modifica, come
-  // faceva la vecchia pagina (altrimenti il refresh ogni 2s cancella quello
-  // che si sta scrivendo).
+  // Preserva focus/valore di input in modifica (nome nodo nm_ e codice
+  // companion pq_): il refresh ogni 2s distrugge il DOM e azzererebbe
+  // quello che l'utente sta scrivendo.
   const act = document.activeElement;
-  let editingId = null, editingVal = null, editingSel = null;
-  if (act && act.id && box.contains(act)) {
-    // Se l'utente sta scrivendo in un campo che non sia il nome nodo,
-    // salta il re-render per non disturbare il cursore.
-    if (!act.id.startsWith('nm_')) return;
+  let editingId = null, editingVal = null, editingSelStart = null, editingSelEnd = null;
+  if (act && act.id && (act.id.indexOf('nm_') === 0 || act.id.indexOf('pq_') === 0)) {
     editingId = act.id; editingVal = act.value;
-    try { editingSel = [act.selectionStart, act.selectionEnd]; } catch {}
+    try { editingSelStart = act.selectionStart; editingSelEnd = act.selectionEnd; } catch(e) {}
   }
 
   box.innerHTML = lastState.nodes.map(renderNode).join('');
@@ -285,11 +256,7 @@ function renderNodes() {
     if (el) {
       el.value = editingVal;
       el.focus();
-      try {
-        const s = editingSel ? editingSel[0] : editingVal.length;
-        const e = editingSel ? editingSel[1] : editingVal.length;
-        el.setSelectionRange(s, e);
-      } catch {}
+      try { el.setSelectionRange(editingSelStart, editingSelEnd); } catch(e) {}
     }
   }
 }
@@ -324,49 +291,12 @@ function renderNode(nd) {
     const s = nd.sensor;
     const presOn = s && s.pres > 0;
     const pres = !s || s.pres < 0 ? '&mdash;' : (s.pres ? 'Presenza' : 'Assente');
-    const curLux = luxRawLive[nd.i] !== undefined ? luxRawLive[nd.i]
-                   : (s && s.light >= 0 ? s.light / 100 : null);
-    const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
+    const lux = !s || s.light < 0 ? '&mdash;' : (s.light/100).toFixed(2) + ' lux';
     const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
-
-    const calib = getNodeCalib(nd.i);
-    const calibSummary = calib && calib.factor_1000 > 0
-      ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)}, zero ${(calib.dark_cl/100).toFixed(2)} lux (rif: ${calib.ref_lux||'?'} lux)`
-      : `<span class="badge warn">Non calibrato</span>`;
-    const darkAcq = calib && calib.dark_cl !== undefined
-      ? `<span class="muted" style="font-size:0.84em">Zero: ${(calib.dark_cl/100).toFixed(2)} lux</span>`
-      : '';
-    const usbLock = !lastState.usbMode ? ' usb-locked' : '';
-    // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
-    const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
-
-    const calibCard = `<div class="card${usbLock}" style="margin-top:10px">
-      <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
-      ${calib && calib.factor_1000 > 0 ? `<p class="muted" style="font-size:0.84em;margin:4px 0 8px">
-        Se vuoi ri-calibrare, azzera prima (il firmware torner&agrave; a valori grezzi).</p>` : ''}
-      <div style="margin:6px 0">
-        <button class="btn sm danger" data-act="calib-zero" data-node="${nd.i}">Azzera calibrazione</button>
-        <span class="muted" style="font-size:0.84em">(passo obbligatorio prima di ri-calibrare)</span>
-      </div>
-      <hr style="margin:10px 0;opacity:.3">
-      <div style="margin:6px 0">
-        <strong>1.</strong> Copri il sensore (buio completo), attendi qualche secondo, poi premi:
-        <button class="btn sm" data-act="calib-dark" data-node="${nd.i}">Cattura zero</button>
-        &nbsp; ${darkAcq}
-      </div>
-      <div style="margin:8px 0">
-        <strong>2.</strong> Scopri il sensore sotto illuminazione nota &mdash;
-        inserisci i lux del sensore di riferimento:
-        <input type="text" inputmode="numeric" id="cref-${nd.i}" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
-        <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra e invia</button>
-        <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
-      </div>
-    </div>`;
-
     return head + `<div class="cards">
         <div class="card"><div class="elem-title">Presenza <span class="pill ${presOn?'on':'off'}">${pres}</span></div></div>
-        <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl" style="margin-top:6px">${luxStr}</div></div>
-      </div>${warn}${calibCard}</div>`;
+        <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl" style="margin-top:6px">${lux}</div></div>
+      </div>${warn}</div>`;
   }
 
   // Mentre lastState.busy e' true (provisioning/config di un nodo in corso,
@@ -439,59 +369,6 @@ function wireNodeEvents(box) {
   box.querySelectorAll('[data-act="unpair"]').forEach(el => {
     el.addEventListener('click', () => { if (confirm('Scollegare il companion?')) api.sendCmd(`CFG:UNPAIR;node=${el.dataset.node}`); });
   });
-
-  // Calibrazione Lux — passo 0: azzera (factor=0 dark=0 → firmware torna a valori grezzi)
-  box.querySelectorAll('[data-act="calib-zero"]').forEach(el => {
-    el.addEventListener('click', () => {
-      const ni = parseInt(el.dataset.node);
-      if (!confirm('Azzerare la calibrazione lux per questo sensore?')) return;
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=0;dark=0`);
-      clearNodeCalib(ni);
-      renderMesh();
-    });
-  });
-
-  // Calibrazione Lux — passo 1: cattura zero (lettura attuale = dark)
-  box.querySelectorAll('[data-act="calib-dark"]').forEach(el => {
-    el.addEventListener('click', () => {
-      const ni = parseInt(el.dataset.node);
-      const cur = luxRawLive[ni];
-      if (cur === undefined) { alert('Nessuna lettura lux disponibile. Attendi il prossimo aggiornamento dal sensore.'); return; }
-      const dark_cl = Math.round(cur * 100);
-      const all = loadLuxCalib();
-      all[String(ni)] = { ...(all[String(ni)] || {}), dark_cl };
-      saveLuxCalib(all);
-      renderMesh();
-    });
-  });
-
-  // Calibrazione Lux — passo 2: calcola factor e invia CFG:SETLUXCALIB
-  box.querySelectorAll('[data-act="calib-save"]').forEach(el => {
-    el.addEventListener('click', () => {
-      const ni = parseInt(el.dataset.node);
-      const refInput = document.getElementById(`cref-${ni}`);
-      const ref_lux = parseFloat(refInput?.value);
-      if (isNaN(ref_lux) || ref_lux <= 0) { alert('Inserisci un valore lux valido (> 0).'); return; }
-      const cur = luxRawLive[ni];
-      if (cur === undefined) { alert('Nessuna lettura lux disponibile. Attendi il prossimo aggiornamento dal sensore.'); return; }
-      const all = loadLuxCalib();
-      const dark_cl = all[String(ni)]?.dark_cl ?? 0;
-      const dark_lux = dark_cl / 100;
-      const net = cur - dark_lux;
-      if (net <= 0) {
-        alert(`La lettura attuale (${cur.toFixed(2)} lux) non supera il valore al buio (${dark_lux.toFixed(2)} lux).\nAssicurati di essere sotto illuminazione sufficiente e che lo zero sia stato acquisito correttamente.`);
-        return;
-      }
-      const factor = ref_lux / net;
-      const factor_1000 = Math.round(factor * 1000);
-      all[String(ni)] = { dark_cl, factor_1000, ref_lux };
-      saveLuxCalib(all);
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=${factor_1000};dark=${dark_cl}`);
-      const msg = document.getElementById(`csm-${ni}`);
-      if (msg) msg.textContent = `Inviato: ×${(factor_1000/1000).toFixed(3)}, zero ${dark_lux.toFixed(2)} lux`;
-      renderMesh();
-    });
-  });
 }
 
 // ============================================================
@@ -516,13 +393,6 @@ export function onCmdResult(type, cmd) {
   } else if (cmd === 'SETHUBNAME') {
     const m = document.getElementById('hubname-msg');
     if (m) m.textContent = type === 'OK' ? 'Salvato' : '';
-  } else if (cmd === 'SETLUXCALIB') {
-    if (type === 'ERR') {
-      // mostra errore nei messaggi attivi nei card calibrazione
-      document.querySelectorAll('[id^="csm-"]').forEach(el => {
-        if (el.textContent.startsWith('Inviato')) el.textContent = 'Errore firmware: comando rifiutato';
-      });
-    }
   }
 }
 
@@ -558,10 +428,9 @@ function renderSensorSlots() {
   ).join('');
   liveBox.innerHTML = liveHtml || '<i class="muted">Nessun sensore configurato</i>';
 
-  // Non ridisegnare i campi se l'utente li ha modificati ma non ancora salvato:
-  // il ridisegno sovrascrive i valori appena scritti (da "Usa MAC", "Usa regola"
-  // o digitazione diretta). Il flag viene azzerato solo su Salva/Elimina.
-  if (sensorSlotsDirty) return;
+  // I campi di editing (mac/regole/nome): non li ridisegno se l'utente ci sta
+  // scrivendo dentro (stesso problema/fix del nome nodo nella mesh).
+  if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#sensor-slots')) return;
 
   const box = document.getElementById('sensor-slots');
   let h = '';
@@ -575,11 +444,8 @@ function renderSensorSlots() {
       <button type="button" class="btn danger sm" data-act="sensorreset" data-slot="${i}">Elimina</button></div>`;
   }
   box.innerHTML = h;
-  // Qualsiasi digitazione nei campi attiva il flag "dirty"
-  box.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { sensorSlotsDirty = true; }));
   box.querySelectorAll('[data-act="sensorsave"]').forEach(b => {
     b.addEventListener('click', () => {
-      sensorSlotsDirty = false; // permette il ridisegno con i nuovi dati dall'ESP
       const i = b.dataset.slot;
       const mac = document.getElementById('bm_' + i).value.trim();
       const rules = document.getElementById('bg_' + i).value.trim();
@@ -591,7 +457,6 @@ function renderSensorSlots() {
   box.querySelectorAll('[data-act="sensorreset"]').forEach(b => {
     b.addEventListener('click', () => {
       if (!confirm(`Svuotare lo slot ${parseInt(b.dataset.slot)+1}?`)) return;
-      sensorSlotsDirty = false;
       api.sendCmd(`CFG:RESETSLOT;slot=${b.dataset.slot}`);
       api.afterStatusRefresh();
     });
@@ -614,7 +479,7 @@ function toggleSniffer() {
     snifferOn = false;
     btn.textContent = 'Avvia sniffer';
     api.stopSnifferPoll();
-    renderSnifferList(); // mantiene la lista, aggiunge indicatore "congelata"
+    document.getElementById('snifflist').innerHTML = '<i>Sniffer fermo.</i>';
   }
 }
 
@@ -638,16 +503,7 @@ function renderByteRow(mac, type, id, hex) {
 }
 
 export function renderSniffer(devs) {
-  // Merge: aggiorna i device già visti, aggiunge quelli nuovi,
-  // non rimuove mai nulla — la lista cresce solo, non si azzera tra un poll e l'altro.
-  devs.forEach(d => {
-    const idx = lastSniffDevs.findIndex(x => x.mac === d.mac);
-    if (idx >= 0) {
-      lastSniffDevs[idx] = d; // aggiorna rssi e payload se cambiano
-    } else {
-      lastSniffDevs.push(d);
-    }
-  });
+  lastSniffDevs = devs;
   renderSnifferList();
 }
 
@@ -656,15 +512,8 @@ function renderSnifferList() {
   const base = pinnedMac ? lastSniffDevs.filter(d => d.mac === pinnedMac) : lastSniffDevs;
   const filtered = q ? base.filter(d => d.mac.toUpperCase().includes(q) || (d.name && d.name.toUpperCase().includes(q))) : base;
 
-  const total = lastSniffDevs.length;
-  const statusLine = snifferOn
-    ? `<span style="font-size:.85em;opacity:.7">${total} dispositivi in memoria${q || pinnedMac ? ` (${filtered.length} visibili)` : ''}</span>`
-    : total > 0
-      ? `<span style="font-size:.85em;opacity:.6"><i>Sniffer fermo — ${total} dispositivi congelati. "Pulisci lista" per azzerare.</i></span>`
-      : '';
-  let h = statusLine ? `<p style="margin:0 0 8px">${statusLine}</p>` : '';
-  const sorted = [...filtered].sort((a, b) => b.rssi - a.rssi); // dal più vicino al più lontano
-  sorted.forEach(d => {
+  let h = '';
+  filtered.forEach(d => {
     h += `<div class="dev-card"><div><b>${d.mac}</b> ${d.name?('('+d.name+')'):''} - ${d.rssi} dBm
         <button type="button" data-act="usemac" data-mac="${d.mac}">Usa MAC</button>
         <button type="button" data-act="copymac" data-mac="${d.mac}">Copia MAC</button>
@@ -680,7 +529,7 @@ function renderSnifferList() {
     b.addEventListener('click', () => {
       const slot = document.getElementById('sniffslot').value;
       const m = document.getElementById('bm_' + slot);
-      if (m) { sensorSlotsDirty = true; m.value = b.dataset.mac; m.focus(); }
+      if (m) m.value = b.dataset.mac;
     });
   });
   list.querySelectorAll('[data-act="copymac"]').forEach(b => {
@@ -701,7 +550,7 @@ function renderSnifferList() {
       const rule = `${b.dataset.type},${b.dataset.id},${b.dataset.off},1,1,${label}`;
       const slot = document.getElementById('sniffslot').value;
       const g = document.getElementById('bg_' + slot);
-      if (g) { sensorSlotsDirty = true; g.value = g.value ? g.value + ';' + rule : rule; g.focus(); }
+      if (g) g.value = g.value ? g.value + ';' + rule : rule;
     });
   });
 }
