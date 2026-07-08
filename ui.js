@@ -12,6 +12,9 @@ let lastStatus = { relays: [], blesensors: [] };
 let logLines = 0;
 const LOG_MAX = 500;
 
+// --- Discovery nodi mesh non provisionati (on-demand via bottone) ---
+let discoveryOn = false;
+
 // --- Sniffer: stato lato client (byte evidenziati, dispositivo isolato) ---
 let snifferOn = false;
 let lastSniffDevs = [];
@@ -42,6 +45,7 @@ export function init(a) {
     if (!confirm('Cancellare tutti i sensori BLE classici configurati?')) return;
     api.sendCmd('CFG:RESETSENSORS');
   });
+  document.getElementById('discbtn').addEventListener('click', toggleDiscovery);
   document.getElementById('sniffbtn').addEventListener('click', toggleSniffer);
   document.getElementById('sniffsearch').addEventListener('input', () => renderSnifferList());
 }
@@ -173,6 +177,17 @@ function renderMesh() {
   document.getElementById('badge-busy').style.display = lastState.busy ? '' : 'none';
   document.getElementById('badge-oob').style.display = lastState.oob ? '' : 'none';
 
+  // Sincronizza il pulsante discovery con lo stato reale del firmware:
+  // utile al riconnect dopo un riavvio ESP (s_mesh_discovery torna false).
+  if (typeof lastState.discActive === 'boolean' && lastState.discActive !== discoveryOn) {
+    discoveryOn = lastState.discActive;
+    const btn = document.getElementById('discbtn');
+    if (btn) {
+      btn.textContent = discoveryOn ? 'Ferma ricerca' : 'Cerca nuovi dispositivi';
+      btn.classList.toggle('warn', discoveryOn);
+    }
+  }
+
   renderDiscovered();
   renderNodes();
 }
@@ -184,8 +199,27 @@ function renderMesh() {
 // (in grigio, non cliccabile) invece di farlo sparire del tutto.
 let provisioningDevice = null;
 
+function toggleDiscovery() {
+  const btn = document.getElementById('discbtn');
+  if (!discoveryOn) {
+    api.sendCmd('CFG:DISCSTART');
+    discoveryOn = true;
+    btn.textContent = 'Ferma ricerca';
+    btn.classList.add('warn');
+  } else {
+    api.sendCmd('CFG:DISCSTOP');
+    discoveryOn = false;
+    btn.textContent = 'Cerca nuovi dispositivi';
+    btn.classList.remove('warn');
+    document.getElementById('discovered-box').innerHTML = '';
+  }
+}
+
 function renderDiscovered() {
   const box = document.getElementById('discovered-box');
+  // La lista si mostra solo durante una sessione di discovery esplicita.
+  if (!discoveryOn) { box.innerHTML = ''; return; }
+
   let list = lastState.discovered || [];
 
   if (!lastState.busy) {
@@ -194,9 +228,12 @@ function renderDiscovered() {
     list = [...list, provisioningDevice];
   }
 
-  if (list.length === 0) { box.innerHTML = ''; return; }
+  if (list.length === 0) {
+    box.innerHTML = '<div class="muted" style="padding:8px 0">Ricerca in corso&hellip; (mesh in pausa durante le finestre di scan)</div>';
+    return;
+  }
 
-  box.innerHTML = '<div class="section-title">Dispositivi rilevati</div>' + list.map(d => {
+  box.innerHTML = list.map(d => {
     const locked = lastState.busy; // provisioning di un altro nodo in corso: tutta la lista in grigio, non cliccabile
     const canProv = !locked && (!d.oob || lastState.oob);
     const oobTag = d.oob ? `<span class="badge warn">OOB</span>` : `<span class="badge">No OOB</span>`;
