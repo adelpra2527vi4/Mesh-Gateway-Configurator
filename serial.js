@@ -104,7 +104,7 @@ export class GatewaySerial extends EventTarget {
     // 'sniffer') e il rumore rendeva impossibile vedere a occhio le righe che
     // contano davvero (DBG;, CFG:OK/ERR, comandi mandati, push) durante un
     // provisioning che richiede minuti - vedi conversazione.
-    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] }; this._armTimer(); return; }
+    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false }; this._armTimer(); return; }
     if (line === 'CFG:STATE_END') {
       this._clearBlockTimer();
       const st = this._stateAcc; this._stateAcc = null;
@@ -189,10 +189,12 @@ export class GatewaySerial extends EventTarget {
         if (node) node.sensor = { pres: parseInt(fields.pres, 10), light: parseInt(fields.light, 10), hassens: fields.hassens === '1' };
         break;
       }
+      case 'DISCACTIVE': st.discActive = fields.on === 'true'; break;
       case 'DISCOVERED':
         st.discovered.push({
           uuid: fields.uuid, addr: fields.addr, rssi: parseInt(fields.rssi, 10), oob: fields.oob === '1',
-          known: fields.known === '1', knownName: fields.knownname || '',
+          known: fields.known === '1', knownName: fields.knownname || '', name: fields.name || '',
+          name: fields.name || '',
         });
         break;
       default: break;
