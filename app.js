@@ -144,7 +144,14 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
   if (gw.connected) { await gw.disconnect(); return; }
   try { await gw.connect(); } catch (err) { ui.log('Errore connessione: ' + err.message, 'err'); }
 });
-document.getElementById('btn-refresh').addEventListener('click', () => { requestState(); requestStatus(); });
+document.getElementById('btn-refresh').addEventListener('click', () => {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.remove('spinning');
+  void btn.offsetWidth; // forza reflow: riavvia l'animazione anche se già attiva
+  btn.classList.add('spinning');
+  setTimeout(() => btn.classList.remove('spinning'), 600);
+  requestState(); requestStatus();
+});
 document.getElementById('btn-clearlog').addEventListener('click', () => ui.clearLog());
 document.getElementById('btn-theme').addEventListener('click', () => {
   document.documentElement.classList.toggle('light');
