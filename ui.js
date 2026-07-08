@@ -4,7 +4,7 @@
 // protocollo a righe CFG: invece che su fetch+JSON.
 
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
-let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] };
+let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
 
 // Calibrazione lux: rawLux live per nodo (aggiornato dai push SENSOR)
 let luxRawLive = {}; // { nodeI: float }
@@ -54,6 +54,8 @@ export function init(a) {
     api.sendCmd('CFG:RESETSENSORS');
   });
 
+  document.getElementById('discbtn').addEventListener('click', toggleDiscovery);
+
   document.getElementById('sniffbtn').addEventListener('click', toggleSniffer);
   document.getElementById('sniffclearbtn').addEventListener('click', () => {
     lastSniffDevs = [];
@@ -77,7 +79,7 @@ export function setConnected(connected) {
   dot.classList.toggle('on', connected);
   document.getElementById('main-content').style.display = connected ? '' : 'none';
   if (!connected) {
-    lastState = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [] };
+    lastState = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
     lastStatus = { relays: [], blesensors: [] };
     snifferOn = false;
     provisioningDevice = null;
@@ -139,7 +141,7 @@ export function renderState(state) {
 // banner e disabilitiamo i pulsanti che lancerebbero comandi di scrittura,
 // cosi' l'utente capisce perche' non succede nulla invece di vedere solo
 // errori in log.
-const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn'];
+const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn'];
 
 function renderUsbModeBanner(usbMode) {
   const banner = document.getElementById('banner');
@@ -200,8 +202,24 @@ function renderMesh() {
   document.getElementById('badge-busy').style.display = lastState.busy ? '' : 'none';
   document.getElementById('badge-oob').style.display = lastState.oob ? '' : 'none';
 
+  renderDiscButton();
   renderDiscovered();
   renderNodes();
+}
+
+// Ricerca nuovi nodi ora e' su richiesta esplicita (CFG:DISCSTART/DISCSTOP,
+// vedi main.c): il pulsante riflette lo stato reale del firmware
+// (lastState.discActive), cosi' mostra correttamente anche lo spegnimento
+// automatico per timeout (60s) senza bisogno di un timer lato client.
+function toggleDiscovery() {
+  api.sendCmd(lastState.discActive ? 'CFG:DISCSTOP' : 'CFG:DISCSTART');
+}
+
+function renderDiscButton() {
+  const btn = document.getElementById('discbtn');
+  if (!btn) return;
+  btn.textContent = lastState.discActive ? 'Ferma ricerca' : 'Cerca nuovi dispositivi';
+  btn.classList.toggle('primary', !!lastState.discActive);
 }
 
 // Il dispositivo che si sta provisionando viene tolto SUBITO da discovered[]
@@ -221,7 +239,12 @@ function renderDiscovered() {
     list = [...list, provisioningDevice];
   }
 
-  if (list.length === 0) { box.innerHTML = ''; return; }
+  if (list.length === 0) {
+    box.innerHTML = lastState.discActive
+      ? '<div class="section-title">Dispositivi rilevati</div><i class="muted">Ricerca in corso...</i>'
+      : '';
+    return;
+  }
 
   box.innerHTML = '<div class="section-title">Dispositivi rilevati</div>' + list.map(d => {
     const locked = lastState.busy; // provisioning di un altro nodo in corso: tutta la lista in grigio, non cliccabile
