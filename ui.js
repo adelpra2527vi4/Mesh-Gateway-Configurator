@@ -266,10 +266,22 @@ function renderDiscovered() {
         : (canProv
           ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}" data-known="${d.known?1:0}" data-knownname="${d.knownName||''}">Provisiona</button>`
           : `<span class="muted">(Registra prima il QR OOB)</span>`));
-    const macFmt = d.addr ? d.addr.replace(/(.{2})(?=.)/g, '$1:').toUpperCase() : d.addr;
-    const nameStr = d.name ? `<span style="font-weight:400;margin-left:6px;opacity:.85">${d.name}</span>` : '';
+    // addr/name vuoti = il firmware non ha ancora risolto MAC/nome veri del
+    // beacon (vedi ble_classic_lookup_mesh_beacon in main.c, richiede una
+    // finestra di scan classico in piu' per intercettare il pacchetto giusto):
+    // pillola animata invece del dato mancante, cosi' si capisce che sta
+    // arrivando e non che manca per sempre.
+    const pendingPill = (label) =>
+      `<span class="pill-pending"><span class="pill-pending-dot"></span>${label}</span>`;
+    const macFmt = d.addr
+      ? d.addr.replace(/(.{2})(?=.)/g, '$1:').toUpperCase()
+      : pendingPill('MAC in verifica...');
+    const nameStr = d.name
+      ? `<span class="dev-name">${d.name}</span>`
+      : pendingPill('Nome in verifica...');
     return `<div class="dev-card${locked ? ' usb-locked' : ''}"><div class="grow">
-        <div style="font-family:ui-monospace,monospace;font-weight:600">${macFmt}${nameStr} <span class="rssi">${d.rssi||0} dBm</span></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${nameStr} <span class="rssi">${d.rssi||0} dBm</span></div>
+        <div style="margin-top:3px;font-family:ui-monospace,monospace">${macFmt}</div>
         <div style="margin-top:3px">${oobTag} ${knownTag} <span class="addr">UUID ${d.uuid.slice(0,8)}...</span></div>
       </div>${btn}</div>`;
   }).join('');
