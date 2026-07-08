@@ -240,8 +240,10 @@ function renderDiscovered() {
       : (canProv
           ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}" data-known="${d.known?1:0}" data-knownname="${d.knownName||''}">Provisiona</button>`
           : `<span class="muted">(Registra prima il QR OOB)</span>`);
+    const macFmt = d.addr ? d.addr.replace(/(.{2})(?=.)/g, '$1:').toUpperCase() : d.addr;
+    const nameStr = d.name ? `<span style="font-weight:400;margin-left:6px;opacity:.85">${d.name}</span>` : '';
     return `<div class="dev-card${locked ? ' usb-locked' : ''}"><div class="grow">
-        <div style="font-family:ui-monospace,monospace;font-weight:600">${d.addr} <span class="rssi">${d.rssi||0} dBm</span></div>
+        <div style="font-family:ui-monospace,monospace;font-weight:600">${macFmt}${nameStr} <span class="rssi">${d.rssi||0} dBm</span></div>
         <div style="margin-top:3px">${oobTag} ${knownTag} <span class="addr">UUID ${d.uuid.slice(0,8)}...</span></div>
       </div>${btn}</div>`;
   }).join('');
