@@ -258,11 +258,14 @@ function renderDiscovered() {
     const knownTag = d.known
       ? `<span class="badge warn">Gia' noto${d.knownName ? (': ' + d.knownName) : ''}</span>`
       : '';
-    const btn = locked
+    const isThisOneProvisioning = locked && provisioningDevice && d.uuid === provisioningDevice.uuid;
+    const btn = isThisOneProvisioning
       ? `<span class="pill wait">Provisioning...</span>`
-      : (canProv
+      : (locked
+        ? `<span class="muted">In attesa...</span>`
+        : (canProv
           ? `<button class="btn primary sm" data-act="provision" data-uuid="${d.uuid}" data-known="${d.known?1:0}" data-knownname="${d.knownName||''}">Provisiona</button>`
-          : `<span class="muted">(Registra prima il QR OOB)</span>`);
+          : `<span class="muted">(Registra prima il QR OOB)</span>`));
     const macFmt = d.addr ? d.addr.replace(/(.{2})(?=.)/g, '$1:').toUpperCase() : d.addr;
     const nameStr = d.name ? `<span style="font-weight:400;margin-left:6px;opacity:.85">${d.name}</span>` : '';
     return `<div class="dev-card${locked ? ' usb-locked' : ''}"><div class="grow">

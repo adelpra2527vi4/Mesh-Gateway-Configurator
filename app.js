@@ -80,13 +80,23 @@ gw.addEventListener('connected', () => {
   // aggiunge traffico USB e porta il firmware a rispondere con decine di righe
   // che competono con i log di debug e i retry di config. Si rallenta a 10s
   // quando busy, si torna a 2s appena il gateway torna libero.
+  let stateTick = 0;
   statePollTimer = setInterval(() => {
     const isBusy = ui.getLastStateBusy();
-    if (!isBusy) requestState();
+    // Durante il busy si rallenta a 10s (1 tick ogni 5) invece di fermarsi
+    // del tutto: altrimenti il client non richiede mai piu' CFG:STATE e non
+    // si accorge quando il firmware torna libero (bisognava usare il
+    // refresh manuale per "sbloccare" la UI a fine provisioning).
+    stateTick++;
+    if (!isBusy) { stateTick = 0; requestState(); }
+    else if (stateTick % 5 === 0) requestState();
   }, 2000);
+  let statusTick = 0;
   statusPollTimer = setInterval(() => {
     const isBusy = ui.getLastStateBusy();
-    if (!isBusy) requestStatus();
+    statusTick++;
+    if (!isBusy) { statusTick = 0; requestStatus(); }
+    else if (statusTick % 5 === 0) requestStatus();
   }, 2000);
   // Poll iniziale sempre, poi si adatta
   requestState();
