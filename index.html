@@ -86,6 +86,45 @@
     <h3>Sensori BLE classici</h3>
     <p><button type="button" id="btn-resetallsensors" class="btn danger sm">Pulisci tutti gli slot</button></p>
     <div id="sensors-live"></div>
+
+    <details class="rule-help">
+      <summary>Guida: come scrivere una regola di decodifica</summary>
+      <div class="rule-help-body">
+        <p>La regola dice al Terminal Controller dove e come estrarre il dato dal pacchetto
+        Bluetooth grezzo del sensore. &Egrave; composta da 6 parametri separati da virgola:</p>
+        <p class="rule-code">FONTE,ID,OFFSET,LUNGHEZZA,OPERATORE,NOME</p>
+        <p>Si possono inserire pi&ugrave; regole nello stesso slot separandole con
+        <code>;</code> (es. per leggere sia temperatura che umidit&agrave; dallo stesso sensore).</p>
+        <ul>
+          <li><b>FONTE</b> &mdash; origine del dato: <code>SVC</code> (Service Data) oppure <code>MFR</code> (Manufacturer Data).</li>
+          <li><b>ID</b> &mdash; identificativo esadecimale della fonte. Per SVC sono i primi 2 byte invertiti (es. <code>6e2a</code> si scrive <code>2A6E</code>). Per MFR &egrave; il codice dell'azienda produttrice. Se non &egrave; noto, usa <code>0</code>: elabora l'intero pacchetto.</li>
+          <li><b>OFFSET</b> &mdash; quanti byte ignorare dall'inizio del payload prima del dato.</li>
+          <li><b>LUNGHEZZA</b> &mdash; quanti byte occupa il dato (da 1 a 4).</li>
+          <li><b>OPERATORE</b> &mdash; come convertire il dato grezzo (vedi elenco sotto).</li>
+          <li><b>NOME</b> &mdash; etichetta con cui il dato verr&agrave; mostrato/salvato.</li>
+        </ul>
+        <p><b>Operatori:</b></p>
+        <ul>
+          <li><code>100</code> &mdash; divide per 100 (es. 2450 &rarr; 24.50).</li>
+          <li><code>S</code> davanti a un numero (es. <code>S100</code>) &mdash; abilita i valori negativi.</li>
+          <li><code>B</code> &mdash; inverte l'ordine dei byte (big-endian), utile se il valore letto sembra sbagliato.</li>
+          <li><code>&amp;N</code> &mdash; AND bit a bit col valore N.</li>
+          <li><code>&gt;&gt;N</code> &mdash; scorrimento a destra di N bit.</li>
+          <li><code>%N</code> &mdash; resto della divisione per N.</li>
+          <li>un numero semplice (es. <code>2</code>, <code>36</code>) &mdash; divide per quel valore.</li>
+        </ul>
+        <p><b>Esempi:</b></p>
+        <ul>
+          <li>Temperatura con segno: <code class="rule-code">SVC,2A6E,0,2,S100,temp</code></li>
+          <li>Temperatura e umidit&agrave; dallo stesso sensore: <code class="rule-code">SVC,181A,6,2,S100,temp;SVC,181A,8,2,100,hum</code></li>
+          <li>Contatore e presenza nello stesso byte: <code class="rule-code">SVC,2A78,0,2,&gt;&gt;1,cnt;SVC,2A78,0,2,&amp;1,pir</code></li>
+        </ul>
+        <p class="muted">Per trovare MAC e regola di un sensore nuovo usa lo sniffer BLE qui sopra:
+        seleziona un byte del payload che cambia quando stimoli fisicamente il sensore &mdash;
+        di solito corrisponde al dato cercato e aiuta a dedurre l'OFFSET giusto.</p>
+      </div>
+    </details>
+
     <div id="sensor-slots"></div>
   </div>
 
