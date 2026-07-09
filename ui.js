@@ -22,16 +22,52 @@ function openQrScanner(targetInputId) {
       <div class="qr-modal-head"><span>Inquadra il QR code</span><button type="button" class="iconbtn" id="qr-close">&times;</button></div>
       <div class="qr-video-wrap">
         <video id="qr-video" autoplay playsinline muted></video>
-        <button type="button" class="iconbtn qr-torch-btn" id="qr-torch" style="display:none" title="Accendi/spegni torcia"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15 2H9l-1 6 2 2v3h4v-3l2-2Z"/></svg></button>
+        <button type="button" class="iconbtn qr-switch-btn" id="qr-switch" style="display:none" title="Cambia fotocamera"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 0 1 15-8.66"/><path d="M22 12a10 10 0 0 1-15 8.66"/><path d="M17 2v5h-5"/><path d="M7 22v-5h5"/></svg></button>
       </div>
       <div class="muted" id="qr-status">Avvio fotocamera...</div>
+      <div class="qr-adjust-row">
+        <label>Contrasto <span id="qr-contrast-val"></span></label>
+        <input type="range" id="qr-contrast" min="100" max="250" step="5">
+      </div>
+      <div class="qr-adjust-row">
+        <label>Luminosit&agrave; <span id="qr-brightness-val"></span></label>
+        <input type="range" id="qr-brightness" min="80" max="220" step="5">
+      </div>
     </div>`;
   document.body.appendChild(overlay);
 
   const video = overlay.querySelector('#qr-video');
   const status = overlay.querySelector('#qr-status');
-  const torchBtn = overlay.querySelector('#qr-torch');
-  let stream = null, rafId = null, stopped = false, torchOn = false;
+  const switchBtn = overlay.querySelector('#qr-switch');
+  let stream = null, rafId = null, stopped = false;
+  let devices = [], devIdx = 0;
+
+  // Contrasto/luminosita' regolabili a mano (prima erano fissi) e ricordati
+  // tra una scansione e l'altra - un QR piccolo/stampato male puo' aver
+  // bisogno di valori diversi da uno grande e ben illuminato.
+  const contrastEl = overlay.querySelector('#qr-contrast');
+  const brightnessEl = overlay.querySelector('#qr-brightness');
+  const contrastVal = overlay.querySelector('#qr-contrast-val');
+  const brightnessVal = overlay.querySelector('#qr-brightness-val');
+  let qrAdjust = { contrast: 140, brightness: 120 };
+  try { qrAdjust = Object.assign(qrAdjust, JSON.parse(localStorage.getItem('qr_adjust') || '{}')); } catch {}
+  contrastEl.value = qrAdjust.contrast;
+  brightnessEl.value = qrAdjust.brightness;
+  contrastVal.textContent = qrAdjust.contrast + '%';
+  brightnessVal.textContent = qrAdjust.brightness + '%';
+  const applyAdjust = () => { ctx.filter = `contrast(${qrAdjust.contrast}%) brightness(${qrAdjust.brightness}%)`; };
+  contrastEl.addEventListener('input', () => {
+    qrAdjust.contrast = parseInt(contrastEl.value, 10);
+    contrastVal.textContent = qrAdjust.contrast + '%';
+    applyAdjust();
+    localStorage.setItem('qr_adjust', JSON.stringify(qrAdjust));
+  });
+  brightnessEl.addEventListener('input', () => {
+    qrAdjust.brightness = parseInt(brightnessEl.value, 10);
+    brightnessVal.textContent = qrAdjust.brightness + '%';
+    applyAdjust();
+    localStorage.setItem('qr_adjust', JSON.stringify(qrAdjust));
+  });
 
   const cleanup = () => {
     stopped = true;
@@ -58,36 +94,54 @@ function openQrScanner(targetInputId) {
   // Boost contrasto/luminosita' sul frame usato per la decodifica (non sul
   // video mostrato all'utente): un QR piccolo o generato a bassa risoluzione
   // ha bordi dei moduli meno netti, aumentare il contrasto aiuta jsQR a
-  // distinguerli senza dover ricorrere solo alla torcia - vedi conversazione.
-  ctx.filter = 'contrast(1.4) brightness(1.2)';
+  // distinguerli. Regolabile a mano dagli slider sopra invece di un valore
+  // fisso - vedi conversazione.
+  applyAdjust();
 
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(s => {
+  // Avvia (o riavvia su cambio fotocamera) lo stream video. Al primo giro
+  // deviceId e' assente e si usa facingMode:'environment' (retrocamera di
+  // default su telefono); dal secondo cambio in poi si punta al deviceId
+  // scelto dal pulsante switch.
+  function startStream(deviceId) {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    const constraints = deviceId
+      ? { video: { deviceId: { exact: deviceId } } }
+      : { video: { facingMode: 'environment' } };
+    return navigator.mediaDevices.getUserMedia(constraints).then(s => {
       stream = s;
       video.srcObject = s;
       status.textContent = 'Ricerca QR code...';
 
-      // Torcia: disponibile solo su alcuni dispositivi (soprattutto
-      // smartphone Android in Chrome), niente su webcam desktop - se manca
-      // la capability il pulsante resta nascosto invece di fare nulla.
-      const track = s.getVideoTracks()[0];
-      const caps = track && track.getCapabilities ? track.getCapabilities() : {};
-      if (caps && caps.torch) {
-        torchBtn.style.display = '';
-        torchBtn.addEventListener('click', () => {
-          torchOn = !torchOn;
-          track.applyConstraints({ advanced: [{ torch: torchOn }] }).catch(() => {});
-          torchBtn.classList.toggle('on', torchOn);
-        });
-      }
       // Se la fotocamera espone il controllo hardware di esposizione, la
       // spingo un po' oltre il default: un QR piccolo/lontano ha moduli
       // sottili che l'auto-esposizione a volte espone troppo debolmente -
       // best-effort, silenzioso se il device non lo supporta.
+      const track = s.getVideoTracks()[0];
+      const caps = track && track.getCapabilities ? track.getCapabilities() : {};
       if (caps && caps.exposureCompensation && caps.exposureMode) {
         const target = Math.min(caps.exposureCompensation.max, (caps.exposureCompensation.max || 0) * 0.6);
         track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureCompensation: target }] }).catch(() => {});
       }
+    });
+  }
+
+  startStream()
+    .then(() => {
+      // Elenco fotocamere disponibili, per il pulsante "cambia fotocamera":
+      // va fatto DOPO il primo getUserMedia perche' prima di aver dato il
+      // permesso enumerateDevices() restituisce label/deviceId vuoti.
+      return navigator.mediaDevices.enumerateDevices().then(list => {
+        devices = list.filter(d => d.kind === 'videoinput');
+        if (devices.length > 1) switchBtn.style.display = '';
+      });
+    })
+    .then(() => {
+      switchBtn.addEventListener('click', () => {
+        if (!devices.length) return;
+        devIdx = (devIdx + 1) % devices.length;
+        status.textContent = 'Cambio fotocamera...';
+        startStream(devices[devIdx].deviceId).catch(() => { status.textContent = 'Impossibile passare a questa fotocamera.'; });
+      });
 
       const tick = () => {
         if (stopped) return;
