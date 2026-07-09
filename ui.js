@@ -314,6 +314,10 @@ function renderNodes() {
     // nome, ma senza bisogno di preservare valore/selezione: basta saltare
     // il render finche' l'utente non chiude il menu da solo.
     if (act.id.startsWith('kind_')) return;
+    // Slider luminosita' in trascinamento: un re-render qui sostituisce il
+    // range sotto al dito/mouse e il pallino "scatta" indietro alla vecchia
+    // posizione - stessa protezione degli altri controlli interattivi.
+    if (act.id.startsWith('lvl_')) return;
     // Se l'utente sta scrivendo in un campo che non sia il nome nodo,
     // salta il re-render per non disturbare il cursore.
     if (!act.id.startsWith('nm_')) return;
@@ -425,8 +429,8 @@ function renderNode(nd) {
   for (const lv of nd.lvls) {
     cards += `<div class="card"><div class="elem-title">Luminosit&agrave; #${lv.e}<span class="pctlbl" data-li-label="${nd.i}-${lv.li}">${lv.pct}%</span></div>
       <span class="addr">${lv.addr}</span>
-      <input type="range" min="0" max="100" value="${lv.pct}" class="slider" style="--p:${lv.pct}%"
-             data-act="level-input" data-node="${nd.i}" data-li="${lv.li}"></div>`;
+      <input type="range" min="0" max="100" value="${lv.pct}" class="slider" style="--p:${lv.pct}"
+             id="lvl_${nd.i}_${lv.li}" data-act="level-input" data-node="${nd.i}" data-li="${lv.li}"></div>`;
   }
   cards += `</div>`;
 
@@ -463,7 +467,7 @@ function wireNodeEvents(box) {
   });
   box.querySelectorAll('[data-act="level-input"]').forEach(el => {
     const label = box.querySelector(`[data-li-label="${el.dataset.node}-${el.dataset.li}"]`);
-    el.addEventListener('input', () => { if (label) label.textContent = el.value + '%'; el.style.setProperty('--p', el.value + '%'); });
+    el.addEventListener('input', () => { if (label) label.textContent = el.value + '%'; el.style.setProperty('--p', el.value); });
     el.addEventListener('change', () => { api.sendCmd(`CFG:LEVEL;node=${el.dataset.node};elem=${el.dataset.li};val=${el.value}`); api.afterCmdRefresh(); });
   });
   box.querySelectorAll('[data-act="pair"]').forEach(el => {

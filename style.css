@@ -79,9 +79,14 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 select,input{font-family:inherit;font-size:.86rem;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 9px}
 select:focus,input:focus{outline:none;border-color:var(--accent)}
 
-.slider{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:999px;margin:12px 0 2px;background:linear-gradient(90deg,var(--accent) var(--p,40%),var(--border) var(--p,40%))}
-.slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer;box-shadow:var(--shadow)}
-.slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer}
+/* Il gradiente segue il centro del pallino (thumb), non il bordo della
+   barra: un range nativo sposta il centro del thumb solo tra meta'-thumb e
+   larghezza-meta'-thumb, mai da 0 a 100% del box. Calcolando lo stop con
+   calc() (meta' thumb in px + percentuale del tratto restante) il colore
+   arriva esattamente sotto al pallino anche agli estremi - vedi conversazione. */
+.slider{--thumb-sz:18px;-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:999px;margin:12px 0 2px;background:linear-gradient(90deg,var(--accent) 0,var(--accent) calc(var(--thumb-sz)/2 + (100% - var(--thumb-sz)) * var(--p,0) / 100),var(--border) 0)}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer;box-shadow:var(--shadow)}
+.slider::-moz-range-thumb{width:calc(var(--thumb-sz) - 2px);height:calc(var(--thumb-sz) - 2px);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer}
 .pctlbl{font-weight:700;color:var(--accent);font-size:1.05rem}
 .muted{color:var(--muted);font-size:.85rem}
 .empty{border:1px dashed var(--border2);border-radius:12px;padding:20px;text-align:center;color:var(--muted);background:var(--surface)}
@@ -130,26 +135,30 @@ details[open] summary::before{content:'\25BE '}
    certa larghezza (schermo stretto/finestra ridotta) torna impilata invece
    di rompersi. */
 .sensor-setup-layout{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
-.sensor-setup-main{flex:1 1 380px;min-width:0}
-.rule-help{flex:0 0 340px;position:sticky;top:70px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 16px;max-height:calc(100vh - 90px);overflow-y:auto}
+.sensor-setup-main{flex:1 1 320px;max-width:400px;min-width:0}
+.rule-help{flex:1 1 380px;position:sticky;top:70px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 16px;max-height:calc(100vh - 90px);overflow-y:auto}
 .rule-help h4{margin:0 0 4px;color:var(--accent)}
 .rule-help-body{font-size:.86rem;line-height:1.55}
 .rule-help-body p{margin:8px 0}
 .rule-help-body ul{margin:6px 0 12px 20px}
 .rule-help-body li{margin:4px 0}
-.rule-code{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px;font-family:ui-monospace,Menlo,monospace;font-size:.86em;margin:4px 0}
+.rule-code{display:inline-block;max-width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px;font-family:ui-monospace,Menlo,monospace;font-size:.86em;margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 
 /* Stesso principio applicato a tutta la PWA (non solo alla guida regole):
    la connessione USB e' obbligatoria quindi si usa sempre da PC, ha senso
    sfruttare lo schermo in orizzontale invece di impilare tutto in colonna
    unica - vedi conversazione. */
 
-/* Tab Mesh: dispositivi rilevati e nodi in griglia multi-colonna invece di
-   una pila lunghissima - su schermo stretto torna comunque a colonna unica
-   (auto-fill fa collassare da solo il numero di colonne). */
-#discovered-box, #nodes-box{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;align-items:start}
-#discovered-box .section-title{grid-column:1/-1}
+/* Tab Mesh: dispositivi rilevati e nodi sempre su 2 colonne (card piu'
+   larghe, come richiesto) - sotto una certa larghezza torna a colonna
+   unica invece di stringere troppo le card. */
+#discovered-box, #nodes-box{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+@media (max-width:760px){ #discovered-box, #nodes-box{grid-template-columns:1fr} }
+#discovered-box .section-title, #nodes-box .section-title{grid-column:1/-1}
 .node,.dev-card{margin:0}
+/* Distacco netto tra "rilevati" e "gia' provisionati": il primo box non ha
+   piu' bisogno di margine sotto (lo da' il titolo del secondo). */
+#discovered-box{margin-bottom:0}
 
 /* Tab Setup: Rel\E8  (colonna stretta) e Sniffer BLE (colonna larga, ha
    bisogno di spazio per ricerca+lista) fianco a fianco. */
