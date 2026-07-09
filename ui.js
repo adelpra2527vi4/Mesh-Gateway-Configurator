@@ -308,6 +308,12 @@ function renderNodes() {
   const act = document.activeElement;
   let editingId = null, editingVal = null, editingSel = null;
   if (act && act.id && box.contains(act)) {
+    // <select> Lampada/Sensore aperto (menu a tendina nativo): un re-render
+    // qui distrugge l'elemento sotto al popup e lo fa chiudere di scatto -
+    // "gioco di velocita'" - vedi conversazione. Stessa protezione del campo
+    // nome, ma senza bisogno di preservare valore/selezione: basta saltare
+    // il render finche' l'utente non chiude il menu da solo.
+    if (act.id.startsWith('kind_')) return;
     // Se l'utente sta scrivendo in un campo che non sia il nome nodo,
     // salta il re-render per non disturbare il cursore.
     if (!act.id.startsWith('nm_')) return;
@@ -344,7 +350,7 @@ function renderNode(nd) {
 
   const stCls = nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait');
   const stTxt = nd.cfg ? 'OK' : (nd.fail ? 'Errore' : 'Config...');
-  const sel = `<select data-act="setkind" data-node="${nd.i}">
+  const sel = `<select id="kind_${nd.i}" data-act="setkind" data-node="${nd.i}">
       <option value="0" ${nd.kind===0?'selected':''}>Lampada</option>
       <option value="1" ${nd.kind===1?'selected':''}>Sensore</option></select>`;
   const fbtn = `<button class="btn danger sm" data-act="forget" data-node="${nd.i}">Rimuovi</button>`;
@@ -367,34 +373,27 @@ function renderNode(nd) {
     const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
     const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
 
+    // Il firmware supporta solo un offset additivo per nodo (sensor_light_cal
+    // in main.c, un solo punto di calibrazione: calibrato = grezzo + offset),
+    // non un fattore moltiplicativo a due punti - vedi CFG:SETLUXCALIB.
     const calib = getNodeCalib(nd.i);
-    const calibSummary = calib && calib.factor_1000 > 0
-      ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)}, zero ${(calib.dark_cl/100).toFixed(2)} lux (rif: ${calib.ref_lux||'?'} lux)`
+    const calibSummary = calib && calib.offset_cl
+      ? `<span class="badge good">Calibrato</span> offset ${(calib.offset_cl/100 >= 0 ? '+' : '')}${(calib.offset_cl/100).toFixed(2)} lux (rif: ${calib.ref_lux||'?'} lux)`
       : `<span class="badge warn">Non calibrato</span>`;
-    const darkAcq = calib && calib.dark_cl !== undefined
-      ? `<span class="muted" style="font-size:0.84em">Zero: ${(calib.dark_cl/100).toFixed(2)} lux</span>`
-      : '';
     const usbLock = !lastState.usbMode ? ' usb-locked' : '';
     // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
     const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
 
     const calibCard = `<div class="card${usbLock}" style="margin-top:10px">
       <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
-      ${calib && calib.factor_1000 > 0 ? `<p class="muted" style="font-size:0.84em;margin:4px 0 8px">
-        Se vuoi ri-calibrare, azzera prima (il firmware torner&agrave; a valori grezzi).</p>` : ''}
       <div style="margin:6px 0">
         <button class="btn sm danger" data-act="calib-zero" data-node="${nd.i}">Azzera calibrazione</button>
-        <span class="muted" style="font-size:0.84em">(passo obbligatorio prima di ri-calibrare)</span>
+        <span class="muted" style="font-size:0.84em">(passo obbligatorio prima di ri-calibrare, cosi' la lettura attuale torna grezza)</span>
       </div>
       <hr style="margin:10px 0;opacity:.3">
-      <div style="margin:6px 0">
-        <strong>1.</strong> Copri il sensore (buio completo), attendi qualche secondo, poi premi:
-        <button class="btn sm" data-act="calib-dark" data-node="${nd.i}">Cattura zero</button>
-        &nbsp; ${darkAcq}
-      </div>
       <div style="margin:8px 0">
-        <strong>2.</strong> Scopri il sensore sotto illuminazione nota &mdash;
-        inserisci i lux del sensore di riferimento:
+        Dopo aver azzerato e atteso una nuova lettura, confronta con un luxmetro di riferimento
+        e inserisci qui i lux letti dallo strumento:
         <input type="text" inputmode="numeric" id="cref-${nd.i}" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
         <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra e invia</button>
         <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
@@ -478,55 +477,37 @@ function wireNodeEvents(box) {
     el.addEventListener('click', () => { if (confirm('Scollegare il companion?')) api.sendCmd(`CFG:UNPAIR;node=${el.dataset.node}`); });
   });
 
-  // Calibrazione Lux — passo 0: azzera (factor=0 dark=0 → firmware torna a valori grezzi)
+  // Calibrazione Lux — azzera (offset=0 → firmware torna a valori grezzi)
   box.querySelectorAll('[data-act="calib-zero"]').forEach(el => {
     el.addEventListener('click', () => {
       const ni = parseInt(el.dataset.node);
       if (!confirm('Azzerare la calibrazione lux per questo sensore?')) return;
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=0;dark=0`);
+      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};offset=0`);
       clearNodeCalib(ni);
       renderMesh();
     });
   });
 
-  // Calibrazione Lux — passo 1: cattura zero (lettura attuale = dark)
-  box.querySelectorAll('[data-act="calib-dark"]').forEach(el => {
-    el.addEventListener('click', () => {
-      const ni = parseInt(el.dataset.node);
-      const cur = luxRawLive[ni];
-      if (cur === undefined) { alert('Nessuna lettura lux disponibile. Attendi il prossimo aggiornamento dal sensore.'); return; }
-      const dark_cl = Math.round(cur * 100);
-      const all = loadLuxCalib();
-      all[String(ni)] = { ...(all[String(ni)] || {}), dark_cl };
-      saveLuxCalib(all);
-      renderMesh();
-    });
-  });
-
-  // Calibrazione Lux — passo 2: calcola factor e invia CFG:SETLUXCALIB
+  // Calibrazione Lux — calcola l'offset additivo e invia CFG:SETLUXCALIB.
+  // Il firmware supporta un solo punto di calibrazione (offset = ref - grezzo),
+  // non un fattore moltiplicativo: per questo va azzerato prima, cosi' la
+  // lettura corrente (lastState/push, gia' "calibrata" col vecchio offset
+  // applicato lato firmware) coincide col valore grezzo del sensore.
   box.querySelectorAll('[data-act="calib-save"]').forEach(el => {
     el.addEventListener('click', () => {
       const ni = parseInt(el.dataset.node);
       const refInput = document.getElementById(`cref-${ni}`);
       const ref_lux = parseFloat(refInput?.value);
-      if (isNaN(ref_lux) || ref_lux <= 0) { alert('Inserisci un valore lux valido (> 0).'); return; }
+      if (isNaN(ref_lux) || ref_lux < 0) { alert('Inserisci un valore lux valido (>= 0).'); return; }
       const cur = luxRawLive[ni];
       if (cur === undefined) { alert('Nessuna lettura lux disponibile. Attendi il prossimo aggiornamento dal sensore.'); return; }
+      const offset_cl = Math.round((ref_lux - cur) * 100);
       const all = loadLuxCalib();
-      const dark_cl = all[String(ni)]?.dark_cl ?? 0;
-      const dark_lux = dark_cl / 100;
-      const net = cur - dark_lux;
-      if (net <= 0) {
-        alert(`La lettura attuale (${cur.toFixed(2)} lux) non supera il valore al buio (${dark_lux.toFixed(2)} lux).\nAssicurati di essere sotto illuminazione sufficiente e che lo zero sia stato acquisito correttamente.`);
-        return;
-      }
-      const factor = ref_lux / net;
-      const factor_1000 = Math.round(factor * 1000);
-      all[String(ni)] = { dark_cl, factor_1000, ref_lux };
+      all[String(ni)] = { offset_cl, ref_lux };
       saveLuxCalib(all);
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=${factor_1000};dark=${dark_cl}`);
+      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};offset=${offset_cl}`);
       const msg = document.getElementById(`csm-${ni}`);
-      if (msg) msg.textContent = `Inviato: ×${(factor_1000/1000).toFixed(3)}, zero ${dark_lux.toFixed(2)} lux`;
+      if (msg) msg.textContent = `Inviato: offset ${offset_cl >= 0 ? '+' : ''}${(offset_cl/100).toFixed(2)} lux`;
       renderMesh();
     });
   });
