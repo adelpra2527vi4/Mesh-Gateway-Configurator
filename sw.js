@@ -2,7 +2,7 @@
 // (niente auto-discovery, vedi spec). Web Serial funziona offline (e' una
 // API browser, non richiede rete) quindi l'app e' usabile anche senza
 // connessione dopo il primo caricamento.
-const CACHE_NAME = 'mesh-gateway-pwa-v3';
+const CACHE_NAME = 'mesh-gateway-pwa-v8';
 const ASSETS = [
   './',
   'index.html',
@@ -13,6 +13,7 @@ const ASSETS = [
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
+  'vendor/jsQR.min.js',
 ];
 
 self.addEventListener('install', (event) => {

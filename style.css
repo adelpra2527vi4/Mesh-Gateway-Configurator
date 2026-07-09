@@ -81,12 +81,19 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 
 /* Il gradiente segue il centro del pallino (thumb), non il bordo della
    barra: un range nativo sposta il centro del thumb solo tra meta'-thumb e
-   larghezza-meta'-thumb, mai da 0 a 100% del box. Calcolando lo stop con
-   calc() (meta' thumb in px + percentuale del tratto restante) il colore
-   arriva esattamente sotto al pallino anche agli estremi - vedi conversazione. */
-.slider{--thumb-sz:18px;-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:999px;margin:12px 0 2px;background:linear-gradient(90deg,var(--accent) 0,var(--accent) calc(var(--thumb-sz)/2 + (100% - var(--thumb-sz)) * var(--p,0) / 100),var(--border) 0)}
-.slider::-webkit-slider-thumb{-webkit-appearance:none;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer;box-shadow:var(--shadow)}
-.slider::-moz-range-thumb{width:calc(var(--thumb-sz) - 2px);height:calc(var(--thumb-sz) - 2px);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer}
+   larghezza-meta'-thumb, mai da 0 a 100% del box. Il primo tentativo con
+   calc() lasciava un "nasino" di colore visibile fuori dal pallino perche'
+   il border:2px del thumb si somma FUORI dalla width dichiarata (box-sizing
+   di default) - il diametro visivo reale era 22px, non i 18px usati nel
+   calcolo. Con box-sizing:border-box il border rientra nella width e i due
+   valori tornano a coincidere - vedi conversazione. */
+/* select,input{padding:6px 9px} (sopra) si applica anche al range: quel
+   padding sfalsava l'area dipinta dal gradiente rispetto alla corsa reale
+   del pallino di ~9px per lato, la causa del residuo visibile agli
+   estremi - va azzerato qui insieme al border, che lo slider non usa. */
+.slider{--thumb-sz:20px;-webkit-appearance:none;appearance:none;box-sizing:border-box;width:100%;height:8px;padding:0;border:none;border-radius:999px;margin:12px 0 2px;background:linear-gradient(90deg,var(--accent) 0,var(--accent) calc(var(--thumb-sz)/2 + (100% - var(--thumb-sz)) * var(--p,0) / 100),var(--border) 0)}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer;box-shadow:var(--shadow)}
+.slider::-moz-range-thumb{box-sizing:border-box;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer}
 .pctlbl{font-weight:700;color:var(--accent);font-size:1.05rem}
 .muted{color:var(--muted);font-size:.85rem}
 .empty{border:1px dashed var(--border2);border-radius:12px;padding:20px;text-align:center;color:var(--muted);background:var(--surface)}
@@ -135,8 +142,8 @@ details[open] summary::before{content:'\25BE '}
    certa larghezza (schermo stretto/finestra ridotta) torna impilata invece
    di rompersi. */
 .sensor-setup-layout{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
-.sensor-setup-main{flex:1 1 320px;max-width:400px;min-width:0}
-.rule-help{flex:1 1 380px;position:sticky;top:70px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 16px;max-height:calc(100vh - 90px);overflow-y:auto}
+.sensor-setup-main{flex:1 1 0;min-width:280px}
+.rule-help{flex:1 1 0;min-width:280px;position:sticky;top:70px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 16px;max-height:calc(100vh - 90px);overflow-y:auto}
 .rule-help h4{margin:0 0 4px;color:var(--accent)}
 .rule-help-body{font-size:.86rem;line-height:1.55}
 .rule-help-body p{margin:8px 0}
@@ -159,6 +166,7 @@ details[open] summary::before{content:'\25BE '}
 /* Distacco netto tra "rilevati" e "gia' provisionati": il primo box non ha
    piu' bisogno di margine sotto (lo da' il titolo del secondo). */
 #discovered-box{margin-bottom:0}
+.section-divider{border:none;border-top:1px solid var(--border);margin:28px 0 0}
 
 /* Tab Setup: Rel\E8  (colonna stretta) e Sniffer BLE (colonna larga, ha
    bisogno di spazio per ricerca+lista) fianco a fianco. */
@@ -177,6 +185,17 @@ details[open] summary::before{content:'\25BE '}
 .log-row.log-tx{color:#5fb3ff}
 .log-row.log-rx{color:#ccc}
 .log-row.log-err{color:var(--red)}
+
+.qr-row{display:flex;align-items:center;gap:8px}
+.qr-scan-btn{flex:none}
+.qr-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.qr-modal-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;width:min(420px,100%);box-shadow:var(--shadow)}
+.qr-modal-head{display:flex;align-items:center;justify-content:space-between;font-weight:700;margin-bottom:10px}
+.qr-modal video{width:100%;border-radius:8px;background:#000;aspect-ratio:1/1;object-fit:cover;display:block}
+.qr-modal .muted{margin-top:8px;text-align:center}
+.qr-video-wrap{position:relative}
+.qr-torch-btn{position:absolute;right:10px;bottom:10px;background:rgba(20,20,20,.55);color:#fff;border:1px solid rgba(255,255,255,.35)}
+.qr-torch-btn.on{background:var(--accent);color:#06140f;border-color:var(--accent)}
 
 #reset-countdown{display:none;background:var(--yellow);color:#1a1a2e;font-weight:700;padding:10px 14px;border-radius:10px;margin:10px 0}
 #banner-nosupport{display:none;background:var(--red);color:#fff;padding:10px 14px;text-align:center;font-weight:600}

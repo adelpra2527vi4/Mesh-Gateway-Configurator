@@ -6,6 +6,119 @@
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
 let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
 
+// Scanner QR companion: decodifica via jsQR (vendor/jsQR.min.js, libreria
+// locale nel progetto, MIT) invece dell'API nativa BarcodeDetector - quella
+// si e' rivelata non disponibile su Chrome desktop/Windows in pratica (solo
+// Android/ChromeOS l'hanno affidabilmente), vedi conversazione. jsQR lavora
+// su un frame video catturato in canvas e funziona in qualsiasi browser
+// moderno, restando comunque un file locale (nessuna CDN a runtime, ok per
+// GitHub Pages offline).
+function openQrScanner(targetInputId) {
+  if (!targetInputId) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'qr-modal';
+  overlay.innerHTML = `
+    <div class="qr-modal-box">
+      <div class="qr-modal-head"><span>Inquadra il QR code</span><button type="button" class="iconbtn" id="qr-close">&times;</button></div>
+      <div class="qr-video-wrap">
+        <video id="qr-video" autoplay playsinline muted></video>
+        <button type="button" class="iconbtn qr-torch-btn" id="qr-torch" style="display:none" title="Accendi/spegni torcia"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15 2H9l-1 6 2 2v3h4v-3l2-2Z"/></svg></button>
+      </div>
+      <div class="muted" id="qr-status">Avvio fotocamera...</div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const video = overlay.querySelector('#qr-video');
+  const status = overlay.querySelector('#qr-status');
+  const torchBtn = overlay.querySelector('#qr-torch');
+  let stream = null, rafId = null, stopped = false, torchOn = false;
+
+  const cleanup = () => {
+    stopped = true;
+    if (rafId) cancelAnimationFrame(rafId);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    overlay.remove();
+  };
+  overlay.querySelector('#qr-close').addEventListener('click', cleanup);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(); });
+
+  if (typeof jsQR !== 'function') {
+    video.style.display = 'none';
+    status.textContent = 'Libreria di scansione QR non caricata. Usa il campo di testo qui sotto.';
+    return;
+  }
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+    video.style.display = 'none';
+    status.textContent = 'Nessuna fotocamera disponibile su questo dispositivo/browser. Usa il campo di testo qui sotto.';
+    return;
+  }
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  // Boost contrasto/luminosita' sul frame usato per la decodifica (non sul
+  // video mostrato all'utente): un QR piccolo o generato a bassa risoluzione
+  // ha bordi dei moduli meno netti, aumentare il contrasto aiuta jsQR a
+  // distinguerli senza dover ricorrere solo alla torcia - vedi conversazione.
+  ctx.filter = 'contrast(1.4) brightness(1.2)';
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(s => {
+      stream = s;
+      video.srcObject = s;
+      status.textContent = 'Ricerca QR code...';
+
+      // Torcia: disponibile solo su alcuni dispositivi (soprattutto
+      // smartphone Android in Chrome), niente su webcam desktop - se manca
+      // la capability il pulsante resta nascosto invece di fare nulla.
+      const track = s.getVideoTracks()[0];
+      const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+      if (caps && caps.torch) {
+        torchBtn.style.display = '';
+        torchBtn.addEventListener('click', () => {
+          torchOn = !torchOn;
+          track.applyConstraints({ advanced: [{ torch: torchOn }] }).catch(() => {});
+          torchBtn.classList.toggle('on', torchOn);
+        });
+      }
+      // Se la fotocamera espone il controllo hardware di esposizione, la
+      // spingo un po' oltre il default: un QR piccolo/lontano ha moduli
+      // sottili che l'auto-esposizione a volte espone troppo debolmente -
+      // best-effort, silenzioso se il device non lo supporta.
+      if (caps && caps.exposureCompensation && caps.exposureMode) {
+        const target = Math.min(caps.exposureCompensation.max, (caps.exposureCompensation.max || 0) * 0.6);
+        track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureCompensation: target }] }).catch(() => {});
+      }
+
+      const tick = () => {
+        if (stopped) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' });
+          if (code && code.data) {
+            // Rilettura per id, non riferimento catturato all'apertura: un
+            // refresh periodico nel frattempo puo' aver ridisegnato
+            // nodes-box e reso l'elemento vecchio "orfano" - scrivendoci
+            // sopra il valore sparirebbe in silenzio - vedi conversazione.
+            const liveInput = document.getElementById(targetInputId);
+            if (liveInput) {
+              liveInput.value = code.data;
+              liveInput.dispatchEvent(new Event('input', { bubbles: true }));
+              liveInput.focus();
+            }
+            cleanup();
+            return;
+          }
+        }
+        rafId = requestAnimationFrame(tick);
+      };
+      rafId = requestAnimationFrame(tick);
+    })
+    .catch(() => { status.textContent = 'Fotocamera non disponibile o permesso negato.'; });
+}
+
 // Calibrazione lux: rawLux live per nodo (aggiornato dai push SENSOR)
 let luxRawLive = {}; // { nodeI: float }
 
@@ -434,10 +547,18 @@ function renderNode(nd) {
   }
   cards += `</div>`;
 
+  // Il pulsante e' sempre visibile (invece di sparire in silenzio se manca
+  // il supporto): se BarcodeDetector/fotocamera non sono disponibili lo
+  // scanner lo dice esplicitamente nel modal, il campo testo resta comunque
+  // sempre utilizzabile come richiesto.
+  const qrBtn = `<button type="button" class="iconbtn qr-scan-btn" data-act="qrscan" data-node="${nd.i}" title="Scansiona QR con la fotocamera"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button>`;
   const pairBox = nd.paired
     ? `<div style="margin:8px 0"><span class="badge good">Abbinato</span></div>
        <button class="btn danger sm" data-act="unpair" data-node="${nd.i}">Scollega companion</button> <span class="muted" id="pm_${nd.i}"></span>`
-    : `<input type="text" id="pq_${nd.i}" placeholder="Contenuto QR interruttore..." style="width:100%;margin:8px 0">
+    : `<div class="qr-row">
+         <input type="text" id="pq_${nd.i}" placeholder="Contenuto QR interruttore..." style="flex:1;margin:8px 0">
+         ${qrBtn}
+       </div>
        <button class="btn sm" data-act="pair" data-node="${nd.i}">Abbina</button> <span class="muted" id="pm_${nd.i}"></span>`;
   const companion = `<div class="card" style="margin-top:10px"><div class="elem-title">Companion switch</div>${pairBox}</div>`;
 
@@ -467,8 +588,31 @@ function wireNodeEvents(box) {
   });
   box.querySelectorAll('[data-act="level-input"]').forEach(el => {
     const label = box.querySelector(`[data-li-label="${el.dataset.node}-${el.dataset.li}"]`);
+    const sendLevel = () => { api.sendCmd(`CFG:LEVEL;node=${el.dataset.node};elem=${el.dataset.li};val=${el.value}`); api.afterCmdRefresh(); };
     el.addEventListener('input', () => { if (label) label.textContent = el.value + '%'; el.style.setProperty('--p', el.value); });
-    el.addEventListener('change', () => { api.sendCmd(`CFG:LEVEL;node=${el.dataset.node};elem=${el.dataset.li};val=${el.value}`); api.afterCmdRefresh(); });
+    el.addEventListener('change', sendLevel);
+    // Regolazione con la rotellina del mouse: un tick = 1%, come le frecce
+    // tastiera del range nativo. preventDefault evita che scrollasse la
+    // pagina invece di muovere il valore.
+    let wheelDebounce = null;
+    el.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      // Porta il focus sullo slider: e' quello che fa scattare la
+      // protezione anti-refresh in renderNodes() (stesso motivo del
+      // trascinamento), altrimenti un re-render a meta' scroll/debounce
+      // riporta il valore a quello ancora confermato dal firmware.
+      if (document.activeElement !== el) el.focus();
+      const step = e.deltaY < 0 ? 1 : -1;
+      const next = Math.min(100, Math.max(0, parseInt(el.value, 10) + step));
+      el.value = next;
+      if (label) label.textContent = next + '%';
+      el.style.setProperty('--p', next);
+      clearTimeout(wheelDebounce);
+      wheelDebounce = setTimeout(sendLevel, 250);
+    }, { passive: false });
+  });
+  box.querySelectorAll('[data-act="qrscan"]').forEach(el => {
+    el.addEventListener('click', () => openQrScanner('pq_' + el.dataset.node));
   });
   box.querySelectorAll('[data-act="pair"]').forEach(el => {
     el.addEventListener('click', () => {
