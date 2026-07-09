@@ -241,12 +241,12 @@ function renderDiscovered() {
 
   if (list.length === 0) {
     box.innerHTML = lastState.discActive
-      ? '<div class="section-title">Dispositivi rilevati</div><i class="muted">Ricerca in corso...</i>'
+      ? '<i class="muted">Ricerca in corso...</i>'
       : '';
     return;
   }
 
-  box.innerHTML = '<div class="section-title">Dispositivi rilevati</div>' + list.map(d => {
+  box.innerHTML = list.map(d => {
     const locked = lastState.busy; // provisioning di un altro nodo in corso: tutta la lista in grigio, non cliccabile
     const canProv = !locked && (!d.oob || lastState.oob);
     const oobTag = d.oob ? `<span class="badge warn">OOB</span>` : `<span class="badge">No OOB</span>`;

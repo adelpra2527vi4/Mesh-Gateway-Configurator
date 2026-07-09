@@ -9,7 +9,7 @@ html{-webkit-text-size-adjust:100%}
    PC/laptop - niente piu' bisogno di tenerla stretta per il mobile. 1180px
    lasciava ancora enormi barre grigie vuote ai lati su un monitor widescreen
    - vedi conversazione ("dovevi recuperare lo spazio delle barre laterali"). */
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:min(1600px,96vw);margin:0 auto;padding:0 16px 56px;color:var(--text);background:var(--bg);line-height:1.45}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:none;margin:0;padding:0 28px 56px;color:var(--text);background:var(--bg);line-height:1.45}
 a{color:var(--accent)}
 h2,h3,h4{color:var(--text);letter-spacing:-.01em}
 h3{font-size:1.05em;margin:22px 0 10px}h4{font-size:.95em;margin:16px 0 6px}
@@ -39,7 +39,7 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .tabpanel.hidden{display:none}
 
 .stats{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
-.stat{flex:1;min-width:96px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
+.stat{flex:1 1 180px;max-width:260px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}
 .stat .num{font-size:1.5rem;font-weight:700;line-height:1.1}
 .stat .lbl{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
 .stat.busy .num{color:var(--yellow)}
@@ -101,11 +101,11 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .field{display:flex;align-items:center;gap:10px;margin:0 0 16px;flex-wrap:wrap}
 .field label{font-weight:600;font-size:.9em}
 .relays{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.relay-btn{padding:12px 18px;border-radius:10px;border:1px solid var(--border);cursor:pointer;font-weight:600;background:var(--surface);color:var(--text);font-family:inherit;font-size:.9em;min-width:96px}
+.relay-btn{flex:1 1 96px;padding:12px 18px;border-radius:10px;border:1px solid var(--border);cursor:pointer;font-weight:600;background:var(--surface);color:var(--text);font-family:inherit;font-size:.9em;min-width:96px}
 .relay-btn:hover{border-color:var(--border2)}
 .relay-btn.on{background:var(--green);color:#06140f;border-color:var(--green)}
-.checks{display:flex;flex-direction:column;gap:8px;margin-top:6px}
-.checks label{display:flex;align-items:center;gap:8px;font-size:.9em;border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:9px 12px;cursor:pointer}
+.checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.checks label{flex:1 1 140px;display:flex;align-items:center;gap:8px;font-size:.9em;border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:9px 12px;cursor:pointer}
 .checks input{accent-color:var(--accent);width:16px;height:16px}
 .slotrow{border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:11px 13px;margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .slotrow .slotn{font-weight:700;font-size:.82em;color:var(--muted);min-width:54px}
@@ -153,14 +153,14 @@ details[open] summary::before{content:'\25BE '}
 
 /* Tab Setup: Rel\E8  (colonna stretta) e Sniffer BLE (colonna larga, ha
    bisogno di spazio per ricerca+lista) fianco a fianco. */
-.setup-top-layout{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;margin-top:18px}
+.setup-top-layout{margin-top:18px}
 .setup-relays-col{flex:0 0 300px}
 /* flex-grow:0 (era 1): con la pagina allargata, "cresci per riempire lo
    spazio" trasformava il riquadro (bordo+sfondo del <details>) in un box
    enorme quasi vuoto - vedi conversazione. Resta della sua larghezza
    naturale, lo spazio avanzato nella riga resta semplicemente sfondo pagina
    invece che dentro un box bordato. */
-.setup-sniffer-col{flex:0 1 560px;margin:0}
+.setup-sniffer-col{margin:0 0 8px}
 
 #log-panel{background:#0a0a14;border-radius:10px;padding:8px 10px;height:160px;overflow-y:auto;font-family:ui-monospace,Menlo,monospace;font-size:.76rem;margin-top:16px}
 :root.light #log-panel{background:#0008}

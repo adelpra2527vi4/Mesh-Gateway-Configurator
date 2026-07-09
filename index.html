@@ -64,13 +64,16 @@
     </div>
 
     <div class="setup-top-layout">
-    <div class="setup-relays-col">
-      <h3>Rel&egrave; <span class="muted">&mdash; tocca per accendere/spegnere</span></h3>
-      <div class="relays" id="relays"></div>
-      <p class="muted" style="margin-top:14px">Rel&egrave; abilitati (presenza fisica del carico):</p>
-      <div class="checks" id="relay-checks"></div>
+    <h3 style="margin-top:6px">Rel&egrave; abilitati <span class="muted">&mdash; presenza fisica del carico</span></h3>
+    <div class="checks" id="relay-checks"></div>
     </div>
 
+    <h3>Rel&egrave; <span class="muted">&mdash; tocca per accendere/spegnere</span></h3>
+    <div class="relays" id="relays"></div>
+
+    <h3>Sensori BLE classici</h3>
+    <div class="sensor-setup-layout">
+    <div class="sensor-setup-main">
     <details open class="setup-sniffer-col">
       <summary>Sniffer BLE (trova mac e payload di un sensore nuovo)</summary>
       <p>Slot di destinazione:
@@ -85,11 +88,6 @@
       <p><input type="text" id="sniffsearch" placeholder="Cerca per mac o nome..."></p>
       <div id="snifflist"><i>Sniffer fermo.</i></div>
     </details>
-    </div>
-
-    <h3>Sensori BLE classici</h3>
-    <div class="sensor-setup-layout">
-    <div class="sensor-setup-main">
     <p><button type="button" id="btn-resetallsensors" class="btn danger sm">Pulisci tutti gli slot</button></p>
     <div id="sensors-live"></div>
     <div id="sensor-slots"></div>
