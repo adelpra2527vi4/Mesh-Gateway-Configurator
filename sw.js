@@ -2,7 +2,7 @@
 // (niente auto-discovery, vedi spec). Web Serial funziona offline (e' una
 // API browser, non richiede rete) quindi l'app e' usabile anche senza
 // connessione dopo il primo caricamento.
-const CACHE_NAME = 'mesh-gateway-pwa-v1';
+const CACHE_NAME = 'mesh-gateway-pwa-v2';
 const ASSETS = [
   './',
   'index.html',
@@ -19,7 +19,16 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
-  self.skipWaiting();
+  // NIENTE self.skipWaiting() automatico qui: un nuovo service worker deve
+  // restare "waiting" finche' l'utente non conferma dal popup "Aggiorna"
+  // (vedi index.html/SKIP_WAITING sotto) - altrimenti la pagina gia' aperta
+  // si ritrova codice nuovo sotto i piedi senza preavviso a meta' sessione.
+});
+
+// Il popup "Aggiorna disponibile" (index.html) manda questo messaggio al
+// click dell'utente: solo allora il SW in attesa prende il controllo.
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

@@ -99,7 +99,48 @@
 <script type="module" src="app.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // Un nuovo SW gia' in "waiting" al momento della registrazione (es.
+      // scaricato in una tab precedente ma mai confermato): mostra subito.
+      if (reg.waiting && navigator.serviceWorker.controller) showUpdatePopup(reg);
+
+      reg.addEventListener('updatefound', () => {
+        const installing = reg.installing;
+        if (!installing) return;
+        installing.addEventListener('statechange', () => {
+          // "installed" + un controller gia' attivo = e' un AGGIORNAMENTO,
+          // non la prima installazione (che non ha ancora nessun controller).
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdatePopup(reg);
+          }
+        });
+      });
+    });
+
+    // Il nuovo SW ha preso il controllo (dopo il click su "Aggiorna" sotto):
+    // ricarica per servire i file dalla cache appena aggiornata.
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    });
+  });
+}
+
+function showUpdatePopup(reg) {
+  if (document.getElementById('update-popup')) return; // gia' mostrato
+  const box = document.createElement('div');
+  box.id = 'update-popup';
+  box.innerHTML =
+    '<span>Nuova versione disponibile</span>' +
+    '<button type="button" id="update-popup-btn" class="btn primary sm">Aggiorna</button>';
+  document.body.appendChild(box);
+  document.getElementById('update-popup-btn').addEventListener('click', () => {
+    if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+    box.remove();
+  });
 }
 </script>
 </body>

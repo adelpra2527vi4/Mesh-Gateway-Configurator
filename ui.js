@@ -373,12 +373,13 @@ function renderNode(nd) {
     const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
     const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
 
-    // Il firmware supporta solo un offset additivo per nodo (sensor_light_cal
-    // in main.c, un solo punto di calibrazione: calibrato = grezzo + offset),
-    // non un fattore moltiplicativo a due punti - vedi CFG:SETLUXCALIB.
+    // Il firmware applica un fattore moltiplicativo per nodo (sensor_light_cal
+    // in main.c: calibrato = grezzo * fattore / 1000) - un offset additivo
+    // provato prima lasciava il buio (grezzo=0) diverso da 0 dopo calibrazione,
+    // sbagliato per definizione - vedi conversazione. Vedi CFG:SETLUXCALIB.
     const calib = getNodeCalib(nd.i);
-    const calibSummary = calib && calib.offset_cl
-      ? `<span class="badge good">Calibrato</span> offset ${(calib.offset_cl/100 >= 0 ? '+' : '')}${(calib.offset_cl/100).toFixed(2)} lux (rif: ${calib.ref_lux||'?'} lux)`
+    const calibSummary = calib && calib.factor_1000
+      ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)} (rif: ${calib.ref_lux||'?'} lux)`
       : `<span class="badge warn">Non calibrato</span>`;
     const usbLock = !lastState.usbMode ? ' usb-locked' : '';
     // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
@@ -477,37 +478,37 @@ function wireNodeEvents(box) {
     el.addEventListener('click', () => { if (confirm('Scollegare il companion?')) api.sendCmd(`CFG:UNPAIR;node=${el.dataset.node}`); });
   });
 
-  // Calibrazione Lux — azzera (offset=0 → firmware torna a valori grezzi)
+  // Calibrazione Lux — azzera (factor=0 → sentinella "non calibrato", il
+  // firmware torna a riportare il valore grezzo del sensore)
   box.querySelectorAll('[data-act="calib-zero"]').forEach(el => {
     el.addEventListener('click', () => {
       const ni = parseInt(el.dataset.node);
       if (!confirm('Azzerare la calibrazione lux per questo sensore?')) return;
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};offset=0`);
+      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=0`);
       clearNodeCalib(ni);
       renderMesh();
     });
   });
 
-  // Calibrazione Lux — calcola l'offset additivo e invia CFG:SETLUXCALIB.
-  // Il firmware supporta un solo punto di calibrazione (offset = ref - grezzo),
-  // non un fattore moltiplicativo: per questo va azzerato prima, cosi' la
-  // lettura corrente (lastState/push, gia' "calibrata" col vecchio offset
-  // applicato lato firmware) coincide col valore grezzo del sensore.
+  // Calibrazione Lux — calcola il fattore moltiplicativo e invia
+  // CFG:SETLUXCALIB. Va azzerato prima (bottone sopra) cosi' la lettura
+  // corrente e' il valore grezzo, non uno gia' calibrato col fattore vecchio.
   box.querySelectorAll('[data-act="calib-save"]').forEach(el => {
     el.addEventListener('click', () => {
       const ni = parseInt(el.dataset.node);
       const refInput = document.getElementById(`cref-${ni}`);
       const ref_lux = parseFloat(refInput?.value);
-      if (isNaN(ref_lux) || ref_lux < 0) { alert('Inserisci un valore lux valido (>= 0).'); return; }
+      if (isNaN(ref_lux) || ref_lux <= 0) { alert('Inserisci un valore lux valido (> 0).'); return; }
       const cur = luxRawLive[ni];
       if (cur === undefined) { alert('Nessuna lettura lux disponibile. Attendi il prossimo aggiornamento dal sensore.'); return; }
-      const offset_cl = Math.round((ref_lux - cur) * 100);
+      if (cur <= 0) { alert(`La lettura attuale (${cur.toFixed(2)} lux) e' zero o negativa: non posso calcolare un fattore da qui. Assicurati che il sensore sia sotto illuminazione sufficiente e non appena azzerato.`); return; }
+      const factor_1000 = Math.round((ref_lux / cur) * 1000);
       const all = loadLuxCalib();
-      all[String(ni)] = { offset_cl, ref_lux };
+      all[String(ni)] = { factor_1000, ref_lux };
       saveLuxCalib(all);
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};offset=${offset_cl}`);
+      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=${factor_1000}`);
       const msg = document.getElementById(`csm-${ni}`);
-      if (msg) msg.textContent = `Inviato: offset ${offset_cl >= 0 ? '+' : ''}${(offset_cl/100).toFixed(2)} lux`;
+      if (msg) msg.textContent = `Inviato: ×${(factor_1000/1000).toFixed(3)}`;
       renderMesh();
     });
   });
