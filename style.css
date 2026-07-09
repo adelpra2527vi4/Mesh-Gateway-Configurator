@@ -4,7 +4,11 @@
 :root.light{--bg:#eef2f6;--surface:#fff;--surface2:#f4f7fa;--border:#dde4ea;--border2:#c6d0da;--accent:#0d8d7e;--accent-fg:#fff;--green:#1f9d57;--red:#d83a3a;--yellow:#b07a12;--text:#16202b;--muted:#5d6b78;--shadow:0 1px 2px rgba(16,32,48,.06)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:880px;margin:0 auto;padding:0 16px 56px;color:var(--text);background:var(--bg);line-height:1.45}
+/* 880px -> 1180px: la connessione USB e' obbligatoria (Web Serial), quindi
+   in pratica l'app si usa solo da PC/laptop - niente piu' bisogno di tenerla
+   stretta per il mobile, e il layout a due colonne di .sensor-setup-layout
+   (vedi sotto) ha bisogno dello spazio in orizzontale. */
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:1180px;margin:0 auto;padding:0 16px 56px;color:var(--text);background:var(--bg);line-height:1.45}
 a{color:var(--accent)}
 h2,h3,h4{color:var(--text);letter-spacing:-.01em}
 h3{font-size:1.05em;margin:22px 0 10px}h4{font-size:.95em;margin:16px 0 6px}
@@ -119,11 +123,38 @@ summary::-webkit-details-marker{display:none}
 summary::before{content:'\25B8 ';color:var(--accent)}
 details[open] summary::before{content:'\25BE '}
 .savebar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:16px 0 6px;margin-top:18px}
-.rule-help-body{font-size:.88rem;line-height:1.55}
+/* Slot sensori a sinistra, guida sempre visibile a destra (fianco a fianco):
+   ha senso solo su schermo largo/PC, ma l'app richiede comunque USB (Web
+   Serial) quindi e' di fatto sempre il caso - vedi conversazione. Sotto una
+   certa larghezza (schermo stretto/finestra ridotta) torna impilata invece
+   di rompersi. */
+.sensor-setup-layout{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.sensor-setup-main{flex:1 1 380px;min-width:0}
+.rule-help{flex:0 0 340px;position:sticky;top:70px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 16px;max-height:calc(100vh - 90px);overflow-y:auto}
+.rule-help h4{margin:0 0 4px;color:var(--accent)}
+.rule-help-body{font-size:.86rem;line-height:1.55}
 .rule-help-body p{margin:8px 0}
 .rule-help-body ul{margin:6px 0 12px 20px}
 .rule-help-body li{margin:4px 0}
 .rule-code{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px;font-family:ui-monospace,Menlo,monospace;font-size:.86em;margin:4px 0}
+
+/* Stesso principio applicato a tutta la PWA (non solo alla guida regole):
+   la connessione USB e' obbligatoria quindi si usa sempre da PC, ha senso
+   sfruttare lo schermo in orizzontale invece di impilare tutto in colonna
+   unica - vedi conversazione. */
+
+/* Tab Mesh: dispositivi rilevati e nodi in griglia multi-colonna invece di
+   una pila lunghissima - su schermo stretto torna comunque a colonna unica
+   (auto-fill fa collassare da solo il numero di colonne). */
+#discovered-box, #nodes-box{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;align-items:start}
+#discovered-box .section-title{grid-column:1/-1}
+.node,.dev-card{margin:0}
+
+/* Tab Setup: Rel\E8  (colonna stretta) e Sniffer BLE (colonna larga, ha
+   bisogno di spazio per ricerca+lista) fianco a fianco. */
+.setup-top-layout{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;margin-top:18px}
+.setup-relays-col{flex:0 0 300px}
+.setup-sniffer-col{flex:1 1 420px;margin:0}
 
 #log-panel{background:#0a0a14;border-radius:10px;padding:8px 10px;height:160px;overflow-y:auto;font-family:ui-monospace,Menlo,monospace;font-size:.76rem;margin-top:16px}
 :root.light #log-panel{background:#0008}
