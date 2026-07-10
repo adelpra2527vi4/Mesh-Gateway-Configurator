@@ -150,7 +150,16 @@ gw.addEventListener('result', (e) => {
 
 gw.addEventListener('push', (e) => ui.applyPush(e.detail));
 
-document.getElementById('btn-connect').addEventListener('click', async () => {
+document.getElementById('btn-connect').addEventListener('click', async (e) => {
+  // Feedback immediato al click (anello che si dilata da sotto il punto
+  // premuto), a prescindere da quanto ci mette la vera connessione/
+  // disconnessione USB a rispondere - vedi conversazione.
+  const btn = e.currentTarget;
+  btn.classList.remove('pressed');
+  void btn.offsetWidth;
+  btn.classList.add('pressed');
+  setTimeout(() => btn.classList.remove('pressed'), 500);
+
   if (gw.connected) { await gw.disconnect(); return; }
   try { await gw.connect(); } catch (err) { ui.log('Errore connessione: ' + err.message, 'err'); }
 });
@@ -159,7 +168,7 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   btn.classList.remove('spinning');
   void btn.offsetWidth; // forza reflow: riavvia l'animazione anche se già attiva
   btn.classList.add('spinning');
-  setTimeout(() => btn.classList.remove('spinning'), 600);
+  setTimeout(() => btn.classList.remove('spinning'), 1400);
   requestState(); requestStatus();
 });
 document.querySelectorAll('.btn-clearlog').forEach(btn => btn.addEventListener('click', () => ui.clearLog()));
@@ -193,10 +202,42 @@ document.querySelectorAll('.btn-copylog').forEach(btn => btn.addEventListener('c
     flash(ok);
   } catch { flash(false); }
 }));
-document.getElementById('btn-theme').addEventListener('click', () => {
-  document.documentElement.classList.toggle('light');
-  localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
-});
+// Pulsante notte/giorno: l'icona mostrata e' quella su cui si sta per
+// cliccare (sole di notte = "passa al giorno", luna di giorno = "passa alla
+// notte"), non lo stato attuale - vedi conversazione. sun/moon.icon-appear e
+// .icon-disappear sono animazioni CSS distinte (vedi style.css); al termine
+// di ciascuna si passa a icon-idle (entrata/riposo) o si toglie ogni classe
+// (uscita, resta invisibile) cosi' l'animazione non si "ripete" da ferma.
+(() => {
+  const btn  = document.getElementById('btn-theme');
+  const sun  = btn.querySelector('.sun');
+  const moon = btn.querySelector('.moon');
+
+  function setIcon(el, cls) {
+    el.classList.remove('icon-appear', 'icon-disappear', 'icon-idle');
+    if (cls) el.classList.add(cls);
+  }
+
+  // showSun=true -> modalita' notturna attiva (mostra il sole, per passare al giorno).
+  function applyIcons(showSun, animate) {
+    const enter = showSun ? sun : moon;
+    const exit  = showSun ? moon : sun;
+    if (!animate) { setIcon(enter, 'icon-idle'); setIcon(exit, null); return; }
+    setIcon(enter, 'icon-appear');
+    setIcon(exit, 'icon-disappear');
+    enter.addEventListener('animationend', () => setIcon(enter, 'icon-idle'), { once: true });
+    exit.addEventListener('animationend', () => setIcon(exit, null), { once: true });
+  }
+
+  applyIcons(!document.documentElement.classList.contains('light'), false); // stato iniziale, senza animare
+
+  btn.addEventListener('click', () => {
+    document.documentElement.classList.toggle('light');
+    const isLight = document.documentElement.classList.contains('light');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    applyIcons(!isLight, true);
+  });
+})();
 
 document.getElementById('tb-mesh').addEventListener('click', () => ui.showTab('mesh'));
 document.getElementById('tb-beacon').addEventListener('click', () => ui.showTab('beacon'));

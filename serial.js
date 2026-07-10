@@ -111,7 +111,7 @@ export class GatewaySerial extends EventTarget {
       if (st) this.dispatchEvent(new CustomEvent('state', { detail: st }));
       return;
     }
-    if (line === 'CFG:STATUS_START') { this._statusAcc = { relays: [], blesensors: [] }; this._armTimer(); return; }
+    if (line === 'CFG:STATUS_START') { this._statusAcc = { relays: [], blesensors: [], mqttState: -1, mqttLast: '' }; this._armTimer(); return; }
     if (line === 'CFG:STATUS_END') {
       this._clearBlockTimer();
       const st = this._statusAcc; this._statusAcc = null;
@@ -226,6 +226,12 @@ export class GatewaySerial extends EventTarget {
     } else if (type === 'BLELAST') {
       const m = line.match(/;slot=(\d+);last=([\s\S]*)$/);
       if (m) { const b = GatewaySerial.getBlesensor(st, parseInt(m[1], 10)); b.last = m[2]; }
+    } else if (type === 'MQTT') {
+      const fields = GatewaySerial.parseFields(line.slice(semi + 1));
+      st.mqttState = parseInt(fields.state, 10);
+    } else if (type === 'MQTTLAST') {
+      const m = line.match(/;last=([\s\S]*)$/);
+      st.mqttLast = m ? m[1] : '';
     }
   }
 

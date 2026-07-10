@@ -18,9 +18,22 @@
   <div class="brand"><span class="dot" id="conn-dot"></span><h1>Terminal Controller</h1></div>
   <span id="badge-busy" class="badge warn" style="display:none">Config...</span>
   <span id="badge-oob" class="badge good" style="display:none">OOB &#9989;</span>
-  <button id="btn-refresh" class="iconbtn" title="Aggiorna"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
-  <button id="btn-theme" class="iconbtn" title="Cambia tema">&#9686;</button>
-  <button id="btn-connect" class="btn primary">Connetti</button>
+  <button id="btn-refresh" class="iconbtn" title="Aggiorna"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg></button>
+  <button id="btn-theme" class="iconbtn theme-toggle" title="Cambia tema" aria-label="Cambia tema">
+    <svg class="theme-icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+      <!-- Puntino fuori asse (non allineato agli 8 raggi, ogni 45°): senza
+           questo la rotazione e' invisibile, un sole a raggi simmetrici
+           torna identico a se stesso 8 volte per giro - vedi conversazione
+           ("il sole non ruota piu'"). -->
+      <circle cx="16.6" cy="6.2" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+    <svg class="theme-icon moon" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
+    </svg>
+  </button>
+  <button id="btn-connect" class="btn primary"><span class="btn-connect-label">Connetti</span></button>
 </div>
 
 <div id="main-content" style="display:none">
@@ -147,6 +160,11 @@
     </div>
     <div id="relays"></div>
 
+    <div class="bar" style="margin:20px 0 4px">
+      <span class="section-title" style="margin:0">MODEM MQTT</span>
+    </div>
+    <div id="mqtt-strip" class="mqtt-strip"></div>
+
     <details open style="margin-top:20px">
       <summary>Log seriale</summary>
       <div class="row" style="margin-bottom:8px">
@@ -179,6 +197,12 @@ if ('serviceWorker' in navigator) {
           }
         });
       });
+
+      // Il browser di suo ricontrolla sw.js solo alla navigazione (o con una
+      // sua euristica interna, anche dopo ore) - reg.update() lo forza ogni
+      // minuto cosi' una nuova versione pubblicata viene notificata mentre
+      // la tab resta aperta, non solo al prossimo riavvio - vedi conversazione.
+      setInterval(() => reg.update(), 60000);
     });
 
     // Il nuovo SW ha preso il controllo (dopo il click su "Aggiorna" sotto):
@@ -197,12 +221,19 @@ function showUpdatePopup(reg) {
   const box = document.createElement('div');
   box.id = 'update-popup';
   box.innerHTML =
+    '<span class="update-popup-dot"></span>' +
     '<span>Nuova versione disponibile</span>' +
     '<button type="button" id="update-popup-btn" class="btn primary sm">Aggiorna</button>';
   document.body.appendChild(box);
-  document.getElementById('update-popup-btn').addEventListener('click', () => {
+  const updateBtn = document.getElementById('update-popup-btn');
+  updateBtn.addEventListener('click', () => {
+    // Feedback immediato al click, prima ancora che il nuovo SW prenda il
+    // controllo e ricarichi la pagina (puo' volerci un istante) - senza,
+    // sembrava che il pulsante non avesse reagito - vedi conversazione.
+    updateBtn.disabled = true;
+    updateBtn.classList.add('update-btn-pressed');
     if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
-    box.remove();
+    setTimeout(() => box.remove(), 500);
   });
 }
 </script>

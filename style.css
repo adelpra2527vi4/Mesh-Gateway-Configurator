@@ -1,7 +1,7 @@
 /* Stessa palette/stile della vecchia pagina web del gateway (root_get_handler
    + setup_get_handler in main.c) - vedi main_grafica.c di riferimento. */
-:root{--bg:#10151b;--surface:#19212b;--surface2:#212c38;--border:#2c3a48;--border2:#3a4b5c;--accent:#2fb6a3;--accent-fg:#06140f;--green:#3fcf8e;--red:#ff6b6b;--yellow:#f2b34a;--text:#e7eef5;--muted:#90a0b0;--radius:14px;--shadow:0 1px 2px rgba(0,0,0,.4)}
-:root.light{--bg:#eef2f6;--surface:#fff;--surface2:#f4f7fa;--border:#dde4ea;--border2:#c6d0da;--accent:#0d8d7e;--accent-fg:#fff;--green:#1f9d57;--red:#d83a3a;--yellow:#b07a12;--text:#16202b;--muted:#5d6b78;--shadow:0 1px 2px rgba(16,32,48,.06)}
+:root{--bg:#10151b;--surface:#19212b;--surface2:#212c38;--border:#2c3a48;--border2:#3a4b5c;--accent:#2fb6a3;--accent-fg:#06140f;--green:#3fcf8e;--red:#ff6b6b;--yellow:#f2b34a;--orange:#ff9f43;--text:#e7eef5;--muted:#90a0b0;--radius:14px;--shadow:0 1px 2px rgba(0,0,0,.4)}
+:root.light{--bg:#eef2f6;--surface:#fff;--surface2:#f4f7fa;--border:#dde4ea;--border2:#c6d0da;--accent:#0d8d7e;--accent-fg:#fff;--green:#1f9d57;--red:#d83a3a;--yellow:#b07a12;--orange:#c9660c;--text:#16202b;--muted:#5d6b78;--shadow:0 1px 2px rgba(16,32,48,.06)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 /* 880px -> ~1600px (limitato al 96% del viewport, non fisso): la connessione
@@ -17,23 +17,119 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 
 .topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 0 12px;margin-bottom:8px;background:linear-gradient(var(--bg) 78%,transparent);flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:180px}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px color-mix(in srgb,var(--red) 22%,transparent)}
-.dot.on{background:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 22%,transparent)}
+/* Pulsazione a "onda", sempre attiva a prescindere dallo stato - vedi
+   conversazione. Prima usava box-shadow con color-mix() ricalcolato ad ogni
+   frame: su Chrome ogni tanto si "inchiodava" a meta' animazione (bug noto
+   di quella combinazione, poco performante). Ora e' uno pseudo-elemento
+   ::after che parte dalla stessa dimensione/colore del dot (background:
+   inherit, niente variabile --pulse-c da tenere sincronizzata) e anima solo
+   transform+opacity, accelerato via GPU e molto piu' affidabile. */
+@keyframes dot-pulse{
+  0%{transform:scale(1);opacity:.55}
+  100%{transform:scale(2.6);opacity:0}
+}
+.dot{position:relative;width:9px;height:9px;border-radius:50%;background:var(--red)}
+.dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:inherit;animation:dot-pulse 1.6s cubic-bezier(0,0,.2,1) infinite}
+.dot.on{background:var(--green)}
 /* Modalita' USB/config (BOOT premuto sul gateway): stesso blu del LED
    fisico invece del verde di modalita' normale - vedi conversazione. */
-.dot.on.usbmode{background:#2f7bf6;box-shadow:0 0 0 4px color-mix(in srgb,#2f7bf6 22%,transparent)}
+.dot.on.usbmode{background:#2f7bf6}
 .topbar h1{margin:0;font-size:1.18rem;letter-spacing:-.01em;font-weight:700}
 .navbtn,.btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-size:.83rem;font-weight:600;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:7px 13px;background:var(--surface);cursor:pointer;font-family:inherit;line-height:1;transition:border-color .12s,color .12s}
 .btn:hover,.navbtn:hover{border-color:var(--accent);color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 .btn.primary:hover{filter:brightness(1.06);color:var(--accent-fg)}
+/* Ricerca (mesh discovery/sniffer BLE) attiva: blu, stesso colore del LED
+   fisico in modalita' USB - vedi conversazione. */
+.btn.searching{background:#2f7bf6;border-color:#2f7bf6;color:#fff}
+.btn.searching:hover{filter:brightness(1.06);color:#fff}
 .btn.danger:hover{border-color:var(--red);color:var(--red)}
 .btn.sm{padding:5px 9px;font-size:.78rem}
 .btn:disabled{opacity:.4;cursor:not-allowed}
-.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--muted);cursor:pointer;font-size:1rem}
+
+/* Pulsante Connetti/Disconnetti: transizione morbida di colore quando
+   cambia stato (non uno scatto secco), un anello che si dilata dal bordo al
+   click (stesso "burst" del pulsante Aggiorna) e l'etichetta che scorre via
+   di lato e la nuova entra dall'altro, invece di cambiare testo di colpo -
+   vedi conversazione. */
+#btn-connect{position:relative;overflow:hidden;transition:background .3s,border-color .3s,color .3s}
+.btn.connected{background:color-mix(in srgb,var(--red) 16%,var(--surface));border-color:var(--red);color:var(--red)}
+.btn.connected:hover{filter:brightness(1.1);color:var(--red)}
+.btn-connect-label{display:inline-block}
+.btn-connect-label.btn-label-out{animation:btn-label-out .18s ease forwards}
+.btn-connect-label.btn-label-in{animation:btn-label-in .22s ease}
+@keyframes btn-label-out{to{transform:translateY(-10px);opacity:0}}
+@keyframes btn-label-in{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+#btn-connect.pressed::after{content:'';position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:.35;animation:btn-connect-burst .5s ease-out forwards}
+@keyframes btn-connect-burst{0%{transform:scale(0);opacity:.35}100%{transform:scale(2.2);opacity:0}}
+.iconbtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--muted);cursor:pointer;font-size:1rem;transition:color .35s,border-color .35s}
 .iconbtn:hover{color:var(--text);border-color:var(--border2)}
-@keyframes spin{to{transform:rotate(360deg)}}
-.iconbtn.spinning svg{animation:spin .6s linear}
+
+/* Pulsante "Aggiorna": rotazione unica, morbida e continua (niente
+   overshoot/scale a scatti - la prima versione era troppo "nervosa", vedi
+   conversazione), con un anello che si dilata piano e sfuma dal bordo del
+   pulsante + il colore che vira verso l'accento durante il giro e torna a
+   sbiadire dopo. */
+.iconbtn.spinning{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+.iconbtn.spinning svg{animation:refresh-spin 1.4s cubic-bezier(.65,.05,.36,1)}
+.iconbtn.spinning::after{content:'';position:absolute;inset:-2px;border-radius:11px;border:2px solid var(--accent);opacity:.55;animation:refresh-burst 1.4s ease-out forwards}
+@keyframes refresh-spin{to{transform:rotate(360deg)}}
+@keyframes refresh-burst{0%{transform:scale(.85);opacity:.5}100%{transform:scale(1.35);opacity:0}}
+
+/* Pulsante notte/giorno: mostra l'icona di CIO' SU CUI SI STA PER CLICCARE
+   (di notte mostra il sole = "passa al giorno", di giorno mostra la luna =
+   "passa alla notte"), non lo stato attuale - vedi conversazione. Sole e
+   luna sono sovrapposti nello stesso spazio; ui.js pilota via classi
+   icon-appear/icon-disappear/icon-idle due animazioni DISTINTE per entrata e
+   uscita di ciascuna icona (non una singola transizione simmetrica) - vedi
+   conversazione ("un'animazione per far sparire il sole e una per farlo
+   riapparire, lo stesso per la luna"). icon-idle e' la vita "a riposo"
+   (rotazione lenta del sole / fluttuazione della luna), attiva solo a
+   transizione conclusa cosi' non entra in conflitto con appear/disappear
+   sulla stessa proprieta' transform.*/
+.theme-toggle{position:relative;overflow:hidden}
+.theme-icon{position:absolute;top:50%;left:50%;width:17px;height:17px;margin:-8.5px 0 0 -8.5px}
+.theme-icon.sun{color:#f2b34a}
+.theme-icon.moon{color:#9db4e0}
+.theme-toggle:hover .theme-icon.sun.icon-idle,.theme-toggle:hover .theme-icon.sun.icon-appear{filter:brightness(1.2)}
+.theme-toggle:hover .theme-icon.moon.icon-idle,.theme-toggle:hover .theme-icon.moon.icon-appear{filter:brightness(1.3)}
+
+/* Stato di riposo puramente CSS (:root.light/:root:not(.light)), NON
+   dipende da ui.js: se per qualsiasi motivo lo script non gira, il
+   pulsante mostra comunque l'icona giusta invece di restare vuoto -
+   icon-appear/disappear/idle sotto sono solo l'animazione in PIU' quando
+   ui.js c'e' ed e' partito. */
+:root:not(.light) .theme-icon.sun{opacity:1;transform:translateY(0)}
+:root:not(.light) .theme-icon.moon{opacity:0;transform:translateY(14px)}
+:root.light .theme-icon.sun{opacity:0;transform:translateY(14px)}
+:root.light .theme-icon.moon{opacity:1;transform:translateY(0)}
+
+.theme-icon.icon-idle{opacity:1}
+.theme-icon.sun.icon-idle{animation:sun-spin 7s linear infinite}
+.theme-icon.moon.icon-idle{animation:moon-float 2.4s ease-in-out infinite}
+
+.theme-icon.sun.icon-appear{animation:sun-appear .5s cubic-bezier(.34,1.56,.64,1) forwards}
+.theme-icon.sun.icon-disappear{animation:sun-disappear .35s ease-in forwards}
+.theme-icon.moon.icon-appear{animation:moon-appear .5s cubic-bezier(.34,1.56,.64,1) forwards}
+.theme-icon.moon.icon-disappear{animation:moon-disappear .35s ease-in forwards}
+
+/* Rotazione pura non si vedrebbe quasi (il sole ha 8 raggi simmetrici ogni
+   45°): ci aggiungo un "respiro" di scala cosi' il movimento resta visibile
+   per tutto il giro, non solo nei 45° dispari - vedi conversazione (dopo il
+   fix per il pulsante vuoto, "mancano tutte le animazioni" era in realta'
+   l'idle troppo lento/impercettibile). */
+@keyframes sun-spin{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(1.15)}100%{transform:rotate(360deg) scale(1)}}
+@keyframes moon-float{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-3px) rotate(4deg)}}
+/* Tramonto/alba: l'icona che esce sprofonda verso il basso e sfuma (come il
+   sole che tramonta sotto l'orizzonte), quella che entra sale da sotto verso
+   il centro (come un'alba) - non piu' un pop elastico sul posto, vedi
+   conversazione ("al click, l'oggetto mostrato dovrebbe tramontare e
+   risalire l'opposto"). overflow:hidden su .theme-toggle fa da "orizzonte"
+   che le taglia ai bordi del pulsante. */
+@keyframes sun-appear{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes sun-disappear{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(14px)}}
+@keyframes moon-appear{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes moon-disappear{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(14px)}}
 
 .tabbar{display:flex;gap:6px;margin:6px 0 20px;flex-wrap:wrap}
 .tabbtn{padding:9px 18px;border-radius:999px;font-size:.85em;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;text-decoration:none;font-family:inherit;display:inline-block}
@@ -81,8 +177,17 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 
 /* Modalita' USB non attiva (vedi ui.js renderUsbModeBanner): blocca i
    controlli interattivi dentro i contenitori marcati, il device li
-   rifiuterebbe comunque ma cosi' e' chiaro all'utente perche'. */
-.usb-locked{opacity:.5;pointer-events:none}
+   rifiuterebbe comunque ma cosi' e' chiaro all'utente perche'. Prima
+   oscurava (opacity) l'intero contenitore, dati/testo compresi - ma in
+   modalita' normale/verde i dati (letture sensori, stato relè, log) restano
+   perfettamente leggibili, solo i comandi non sono inviabili: disattiva/
+   sbiadisce solo i controlli veri e propri, non tutto il blocco - vedi
+   conversazione.
+   <details>/<summary> esclusi apposta: aprire un pannello di configurazione
+   per guardarlo non richiede la modalita' USB, solo salvare (il pulsante
+   dentro il pannello) la richiede. */
+.usb-locked button, .usb-locked input, .usb-locked select, .usb-locked textarea,
+.usb-locked .switch{opacity:.5;pointer-events:none}
 
 .name-input{font-size:1rem;font-weight:700;border:1px solid transparent;border-radius:8px;padding:5px 8px;width:160px;max-width:48vw;background:transparent;color:var(--text)}
 .name-input:hover{border-color:var(--border)}
@@ -121,8 +226,21 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .sniff-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 .rssi{font-size:.78rem;color:var(--muted)}
 .dev-name{font-weight:700;font-size:1.02rem;color:var(--accent,var(--green));padding:2px 8px;border-radius:7px;background:color-mix(in srgb,var(--accent,var(--green)) 14%,transparent);border:1px solid color-mix(in srgb,var(--accent,var(--green)) 35%,var(--border))}
-#update-popup{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:.88rem;font-weight:600;animation:update-popup-in .25s ease}
+/* Popup di aggiornamento: doveva "dare fastidio" finche' non lo si nota
+   (nuova versione disponibile = da installare, non da ignorare per giorni)
+   - bordo che pulsa con un bagliore acceso + un dot lampeggiante (stesso
+   dot-pulse gia' usato per gli altri indicatori di stato) invece di stare
+   li' fermo e passare inosservato - vedi conversazione. */
+#update-popup{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--accent);border-radius:12px;padding:12px 16px;font-size:.88rem;font-weight:600;animation:update-popup-in .25s ease,update-popup-glow 1.7s ease-in-out .3s infinite}
+.update-popup-dot{position:relative;width:8px;height:8px;border-radius:50%;flex:none;background:var(--accent)}
+.update-popup-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:inherit;animation:dot-pulse 1.6s cubic-bezier(0,0,.2,1) infinite}
 @keyframes update-popup-in{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes update-popup-glow{0%,100%{box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}50%{box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 16px 3px color-mix(in srgb,var(--accent) 60%,transparent)}}
+/* Pressione del pulsante "Aggiorna" nel popup di update: si comprime subito
+   al click (icona/testo invariati, la pagina sta per ricaricarsi da sola) -
+   vedi conversazione ("un'animazione sul pulsante appena premuto"). */
+.update-btn-pressed{animation:update-btn-press .5s ease forwards}
+@keyframes update-btn-press{0%{transform:scale(1)}30%{transform:scale(.88)}100%{transform:scale(.94);opacity:.75}}
 .pill-pending{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;color:var(--yellow);background:color-mix(in srgb,var(--yellow) 14%,transparent);border:1px solid color-mix(in srgb,var(--yellow) 35%,var(--border));border-radius:999px;padding:2px 9px}
 .pill-pending-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pill-pending-blink 1.1s ease-in-out infinite}
 @keyframes pill-pending-blink{0%,100%{opacity:.25}50%{opacity:1}}
@@ -273,3 +391,24 @@ details[open] summary::before{content:'\25BE '}
 
 #reset-countdown{display:none;background:var(--yellow);color:#1a1a2e;font-weight:700;padding:10px 14px;border-radius:10px;margin:10px 0}
 #banner-nosupport{display:none;background:var(--red);color:#fff;padding:10px 14px;text-align:center;font-weight:600}
+
+/* "Radar": pallino + due anelli concentrici che si espandono e sfumano in
+   loop, usato ovunque compaia "ricerca/sniffer in corso" (pulsante Cerca
+   nuovi dispositivi, box "Ricerca in corso...", pulsante/status sniffer BLE)
+   - vedi conversazione ("un simbolo con una bella animazione"). */
+.radar-ping{position:relative;display:inline-block;width:15px;height:15px;vertical-align:middle;margin-right:7px}
+.radar-dot{position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:currentColor;z-index:2}
+.radar-ring{position:absolute;top:50%;left:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;border:1.5px solid currentColor;opacity:0;animation:radar-ring 1.8s ease-out infinite}
+.radar-ring.r2{animation-delay:.9s}
+@keyframes radar-ring{0%{transform:scale(1);opacity:.8}100%{transform:scale(4.5);opacity:0}}
+
+/* Striscia di stato modem MQTT (tab Dispositivo) - vedi renderMqttStrip in ui.js */
+.mqtt-strip{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;flex-wrap:wrap}
+.mqtt-dot{position:relative;width:11px;height:11px;border-radius:50%;flex:none;background:var(--muted)}
+.mqtt-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:inherit;animation:dot-pulse 1.6s cubic-bezier(0,0,.2,1) infinite}
+.mqtt-dot.bad{background:var(--red)}
+.mqtt-dot.warn{background:var(--yellow)}
+.mqtt-dot.orange{background:var(--orange)}
+.mqtt-dot.good{background:var(--green)}
+.mqtt-state-label{font-weight:700;font-size:.88rem;flex:none}
+.mqtt-last{font-family:ui-monospace,monospace;font-size:.82rem;color:var(--muted);word-break:break-all}

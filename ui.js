@@ -338,8 +338,28 @@ export function showTab(name) {
 
 export function setConnected(connected) {
   const btn = document.getElementById('btn-connect');
+  const label = btn.querySelector('.btn-connect-label');
   const dot = document.getElementById('conn-dot');
-  btn.textContent = connected ? 'Disconnetti' : 'Connetti';
+  const newText = connected ? 'Disconnetti' : 'Connetti';
+  // Il testo scorre via e il nuovo entra dall'altro lato, invece di cambiare
+  // di scatto - stessa idea del pulsante notte/giorno ma orizzontale, dato
+  // che qui e' testo non un'icona - vedi conversazione ("un'animazione
+  // anche per il pulsante connetti/disconnetti").
+  if (label && label.textContent !== newText) {
+    label.classList.remove('btn-label-out');
+    void label.offsetWidth; // riavvia l'animazione anche se già in corso
+    label.classList.add('btn-label-out');
+    label.addEventListener('animationend', () => {
+      label.textContent = newText;
+      label.classList.remove('btn-label-out');
+      label.classList.add('btn-label-in');
+      label.addEventListener('animationend', () => label.classList.remove('btn-label-in'), { once: true });
+    }, { once: true });
+  } else if (label) {
+    label.textContent = newText;
+  }
+  btn.classList.toggle('primary', !connected);
+  btn.classList.toggle('connected', connected);
   dot.classList.toggle('on', connected);
   if (!connected) dot.classList.remove('usbmode');
   document.getElementById('main-content').style.display = connected ? '' : 'none';
@@ -429,7 +449,7 @@ function renderUsbModeBanner(usbMode) {
   const banner = document.getElementById('banner');
   if (banner) {
     if (!usbMode) {
-      banner.textContent = 'Device in modalita\' MQTT: tieni premuto il pulsante BOOT sul gateway per qualche secondo per attivare la modalita\' USB e abilitare scan/provisioning/relè.';
+      banner.textContent = 'Modalità MQTT attiva: tieni premuto BOOT sul gateway per passare a USB e sbloccare scan/provisioning/relè.';
       banner.style.display = 'block'; // #banner ha gia' il suo stile (rosso/border) in style.css
     } else {
       banner.style.display = 'none';
@@ -497,11 +517,17 @@ function toggleDiscovery() {
   api.sendCmd(lastState.discActive ? 'CFG:DISCSTOP' : 'CFG:DISCSTART');
 }
 
+// Icona radar (pallino + due anelli concentrici che si espandono e sfumano
+// in loop): usata ovunque nella UI compaia "ricerca/sniffer in corso", al
+// posto di un testo statico - vedi conversazione ("un simbolo con una bella
+// animazione, fagli fare qualcosa").
+const RADAR_HTML = '<span class="radar-ping"><span class="radar-dot"></span><span class="radar-ring"></span><span class="radar-ring r2"></span></span>';
+
 function renderDiscButton() {
   const btn = document.getElementById('discbtn');
   if (!btn) return;
-  btn.textContent = lastState.discActive ? 'Ferma ricerca' : 'Cerca nuovi dispositivi';
-  btn.classList.toggle('primary', !!lastState.discActive);
+  btn.innerHTML = lastState.discActive ? (RADAR_HTML + 'Ferma ricerca') : 'Cerca nuovi dispositivi';
+  btn.classList.toggle('searching', !!lastState.discActive);
 }
 
 // Il dispositivo che si sta provisionando viene tolto SUBITO da discovered[]
@@ -522,9 +548,7 @@ function renderDiscovered() {
   }
 
   if (list.length === 0) {
-    box.innerHTML = lastState.discActive
-      ? '<i class="muted">Ricerca in corso...</i>'
-      : '';
+    box.innerHTML = '';
     return;
   }
 
@@ -628,22 +652,23 @@ function renderNode(nd) {
   const nameInput = `<input class="name-input" id="nm_${nd.i}" value="${(nd.name||'').replace(/"/g,'')}" placeholder="Nome dispositivo">`
     + `<button class="btn sm" data-act="setname" data-node="${nd.i}">Salva</button> <span class="muted" id="nmsave_${nd.i}"></span>`;
 
+  // Nodo raggiungibile davvero adesso, non solo "configurato una volta" -
+  // basato sull'ultima risposta reale vista dal firmware (main.c
+  // node_is_online/s_node_last_seen_us). Prima era un badge "Offline" a se'
+  // stante accanto al pill "Connesso" (i due si contraddicevano a vista) -
+  // ora sostituisce direttamente il pill stesso, in rosso - vedi conversazione.
+  const swOffline = nd.sw && nd.cfg && !nd.online;
   if (nd.sw) {
+    const swCls = swOffline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
+    const swTxt = swOffline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
     return `<div class="node"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span>
-      <span class="pill ${nd.cfg?'ok':(nd.fail?'err':'wait')}">${nd.cfg?'OK':(nd.fail?'Errore':'Config...')}</span>
+      <span class="pill ${swCls}">${swTxt}</span>
       <button class="btn danger sm" style="margin-left:auto" data-act="forget" data-node="${nd.i}">Rimuovi</button></div></div>`;
   }
 
-  const stCls = nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait');
-  const stTxt = nd.cfg ? 'OK' : (nd.fail ? 'Errore' : 'Config...');
-  // "OK" sopra riguarda solo il bind/config completato una volta, non dice
-  // se il nodo risponde ancora adesso - un nodo scollegato dalla corrente
-  // restava per sempre "OK" con l'ultimo stato noto, senza nessun segnale
-  // che fosse irraggiungibile. offlineBadge e' un indicatore separato,
-  // basato sull'ultima risposta reale vista dal firmware - vedi
-  // conversazione (main.c node_is_online/s_node_last_seen_us).
   const offline = nd.cfg && !nd.online;
-  const offlineBadge = offline ? `<span class="badge bad">Offline</span>` : '';
+  const stCls = offline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
+  const stTxt = offline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
   const sel = `<select id="kind_${nd.i}" data-act="setkind" data-node="${nd.i}">
       <option value="0" ${nd.kind===0?'selected':''}>Lampada</option>
       <option value="1" ${nd.kind===1?'selected':''}>Sensore</option></select>`;
@@ -653,7 +678,7 @@ function renderNode(nd) {
     : '';
   const rbtn = nd.kind === 0 ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
 
-  let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span>${offlineBadge}</div>`
+  let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span></div>`
     + `<div class="node-meta">${sel} ${rbtn} ${grpBadge} <span style="margin-left:auto">${fbtn}</span></div>`;
 
   if (!nd.cfg) return head + `<div class="empty" style="margin-top:10px">Non ancora configurato.</div></div>`;
@@ -851,6 +876,7 @@ export function renderStatus(status) {
   }
 
   renderRelays();
+  renderMqttStrip();
   renderSensorSlots();
 }
 
@@ -918,6 +944,33 @@ function renderRelays() {
       api.afterStatusRefresh();
     });
   });
+}
+
+// Striscia di stato del modem MQTT (tab Dispositivo, tra i relè e il log):
+// stato sintetico del firmware (modem_mqtt.c) + ultimo payload ricevuto,
+// utile per capire se il gateway sta parlando col server senza dover aprire
+// il log seriale - vedi conversazione.
+const MQTT_STATE_INFO = {
+  0: { cls: 'bad',  label: 'Non risponde' },
+  1: { cls: 'warn', label: 'Riconnessione in corso...' },
+  2: { cls: 'orange', label: 'Riavvio modem in corso...' },
+  3: { cls: 'good', label: 'Connesso' },
+};
+function mqttEsc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+function renderMqttStrip() {
+  const box = document.getElementById('mqtt-strip');
+  if (!box) return;
+  const state = lastStatus.mqttState;
+  const info = MQTT_STATE_INFO[state];
+  if (!info) { box.innerHTML = ''; return; }
+  const last = lastStatus.mqttLast || '';
+  box.innerHTML = `<span class="mqtt-dot ${info.cls}"></span>
+    <span class="mqtt-state-label">${info.label}</span>
+    <span class="mqtt-last">${last ? mqttEsc(last) : '<i class="muted">nessun messaggio ricevuto</i>'}</span>`;
 }
 
 // "last" arriva dal firmware come "chiave=valore;chiave2=valore2;...;rssi=N"
@@ -1031,12 +1084,14 @@ function toggleSniffer() {
     pinnedMac = null; everChanged = {}; prevHex = {};
     api.sendCmd('CFG:SNIFFERSTART');
     snifferOn = true;
-    btn.textContent = 'Ferma sniffer';
+    btn.innerHTML = RADAR_HTML + 'Ferma sniffer';
+    btn.classList.add('searching');
     api.startSnifferPoll();
   } else {
     api.sendCmd('CFG:SNIFFERSTOP');
     snifferOn = false;
-    btn.textContent = 'Avvia sniffer';
+    btn.innerHTML = 'Avvia sniffer';
+    btn.classList.remove('searching');
     api.stopSnifferPoll();
     renderSnifferList(); // mantiene la lista, aggiunge indicatore "congelata"
   }
