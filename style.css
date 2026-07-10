@@ -179,8 +179,8 @@ details[open] summary::before{content:'\25BE '}
    invece che dentro un box bordato. */
 .setup-sniffer-col{margin:0 0 8px}
 
-#log-panel{background:#0a0a14;border-radius:10px;padding:8px 10px;height:160px;overflow-y:auto;font-family:ui-monospace,Menlo,monospace;font-size:.76rem;margin-top:16px}
-:root.light #log-panel{background:#0008}
+.log-panel{background:#0a0a14;border-radius:10px;padding:8px 10px;height:160px;overflow-y:auto;font-family:ui-monospace,Menlo,monospace;font-size:.76rem;margin-top:16px}
+:root.light .log-panel{background:#0008}
 .log-row{white-space:pre-wrap;word-break:break-all}
 .log-row.log-tx{color:#5fb3ff}
 .log-row.log-rx{color:#ccc}
@@ -196,8 +196,23 @@ details[open] summary::before{content:'\25BE '}
 .qr-adjust-row{margin-top:10px;font-size:.82rem}
 .qr-adjust-row label{display:flex;justify-content:space-between;color:var(--muted);margin-bottom:3px}
 .qr-adjust-row input[type="range"]{margin:0;padding:0;width:100%;border:none}
+.qr-invert-row{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:.85rem;cursor:pointer}
+.qr-invert-row input{accent-color:var(--accent);width:15px;height:15px;padding:0}
 .qr-video-wrap{position:relative}
 .qr-switch-btn{position:absolute;right:10px;top:10px;background:rgba(20,20,20,.55);color:#fff;border:1px solid rgba(255,255,255,.35)}
+/* Mirino puramente visivo per capire se l'inquadratura e' dritta rispetto
+   all'ottica - non tocca in alcun modo il frame passato a jsQR, e'
+   solo un overlay sopra il video - vedi conversazione. */
+.qr-guide{position:absolute;inset:12%;pointer-events:none}
+.qr-guide-grid{position:absolute;inset:0;background-image:
+  linear-gradient(rgba(255,255,255,.35) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(255,255,255,.35) 1px,transparent 1px);
+  background-size:calc(100%/3) calc(100%/3)}
+.qr-guide-corner{position:absolute;width:26px;height:26px;border:3px solid var(--accent)}
+.qr-guide-corner.tl{top:-3px;left:-3px;border-right:none;border-bottom:none}
+.qr-guide-corner.tr{top:-3px;right:-3px;border-left:none;border-bottom:none}
+.qr-guide-corner.bl{bottom:-3px;left:-3px;border-right:none;border-top:none}
+.qr-guide-corner.br{bottom:-3px;right:-3px;border-left:none;border-top:none}
 
 #reset-countdown{display:none;background:var(--yellow);color:#1a1a2e;font-weight:700;padding:10px 14px;border-radius:10px;margin:10px 0}
 #banner-nosupport{display:none;background:var(--red);color:#fff;padding:10px 14px;text-align:center;font-weight:600}

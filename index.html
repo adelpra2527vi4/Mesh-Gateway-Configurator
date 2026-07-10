@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mesh Gateway</title>
+<title>Terminal Controller</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2fb6a3">
 <script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');</script>
@@ -15,7 +15,7 @@
 </div>
 
 <div class="topbar">
-  <div class="brand"><span class="dot" id="conn-dot"></span><h1>Mesh Gateway</h1></div>
+  <div class="brand"><span class="dot" id="conn-dot"></span><h1>Terminal Controller</h1></div>
   <span id="badge-busy" class="badge warn" style="display:none">Config...</span>
   <span id="badge-oob" class="badge good" style="display:none">OOB &#9989;</span>
   <button id="btn-refresh" class="iconbtn" title="Aggiorna"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
@@ -26,7 +26,8 @@
 <div id="main-content" style="display:none">
   <div class="tabbar">
     <button type="button" class="tabbtn active" id="tb-mesh">Mesh</button>
-    <button type="button" class="tabbtn" id="tb-setup">Setup</button>
+    <button type="button" class="tabbtn" id="tb-beacon">Beacon</button>
+    <button type="button" class="tabbtn" id="tb-device">Dispositivo</button>
   </div>
 
   <div id="reset-countdown"></div>
@@ -58,24 +59,9 @@
     </div>
   </div>
 
-  <!-- ===================== TAB SETUP ===================== -->
-  <div id="tab-setup" class="tabpanel hidden">
-    <div class="field">
-      <label>Nome hub</label>
-      <input type="text" id="hubname-input" placeholder="Hub-1">
-      <button id="btn-sethubname" class="btn sm">Salva</button>
-      <span class="muted" id="hubname-msg"></span>
-    </div>
-
-    <div class="setup-top-layout">
-    <h3 style="margin-top:6px">Rel&egrave; abilitati <span class="muted">&mdash; presenza fisica del carico</span></h3>
-    <div class="checks" id="relay-checks"></div>
-    </div>
-
-    <h3>Rel&egrave; <span class="muted">&mdash; tocca per accendere/spegnere</span></h3>
-    <div class="relays" id="relays"></div>
-
-    <h3>Sensori BLE classici</h3>
+  <!-- ===================== TAB BEACON ===================== -->
+  <div id="tab-beacon" class="tabpanel hidden">
+    <h3 style="margin-top:6px">Sensori BLE classici</h3>
     <div class="sensor-setup-layout">
     <div class="sensor-setup-main">
     <details open class="setup-sniffer-col">
@@ -135,13 +121,37 @@
       </div>
     </aside>
     </div>
+
+    <details open style="margin-top:20px">
+      <summary>Log seriale</summary>
+      <div class="row" style="margin-bottom:8px"><button class="btn sm btn-clearlog">Pulisci log</button></div>
+      <div class="log-panel"></div>
+    </details>
   </div>
 
-  <details open style="margin-top:20px">
-    <summary>Log seriale</summary>
-    <div class="row" style="margin-bottom:8px"><button id="btn-clearlog" class="btn sm">Pulisci log</button></div>
-    <div id="log-panel"></div>
-  </details>
+  <!-- ===================== TAB DISPOSITIVO ===================== -->
+  <div id="tab-device" class="tabpanel hidden">
+    <div class="field">
+      <label>Nome hub</label>
+      <input type="text" id="hubname-input" placeholder="Hub-1">
+      <button id="btn-sethubname" class="btn sm">Salva</button>
+      <span class="muted" id="hubname-msg"></span>
+    </div>
+
+    <div class="setup-top-layout">
+    <h3 style="margin-top:6px">Rel&egrave; abilitati <span class="muted">&mdash; presenza fisica del carico</span></h3>
+    <div class="checks" id="relay-checks"></div>
+    </div>
+
+    <h3>Rel&egrave; <span class="muted">&mdash; tocca per accendere/spegnere</span></h3>
+    <div class="relays" id="relays"></div>
+
+    <details open style="margin-top:20px">
+      <summary>Log seriale</summary>
+      <div class="row" style="margin-bottom:8px"><button class="btn sm btn-clearlog">Pulisci log</button></div>
+      <div class="log-panel"></div>
+    </details>
+  </div>
 </div>
 
 <script src="vendor/jsQR.min.js"></script>

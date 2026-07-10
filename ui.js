@@ -23,15 +23,30 @@ function openQrScanner(targetInputId) {
       <div class="qr-video-wrap">
         <video id="qr-video" autoplay playsinline muted></video>
         <button type="button" class="iconbtn qr-switch-btn" id="qr-switch" style="display:none" title="Cambia fotocamera"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 0 1 15-8.66"/><path d="M22 12a10 10 0 0 1-15 8.66"/><path d="M17 2v5h-5"/><path d="M7 22v-5h5"/></svg></button>
+        <div class="qr-guide">
+          <div class="qr-guide-grid"></div>
+          <span class="qr-guide-corner tl"></span><span class="qr-guide-corner tr"></span>
+          <span class="qr-guide-corner bl"></span><span class="qr-guide-corner br"></span>
+        </div>
       </div>
       <div class="muted" id="qr-status">Avvio fotocamera...</div>
       <div class="qr-adjust-row">
         <label>Contrasto <span id="qr-contrast-val"></span></label>
-        <input type="range" id="qr-contrast" min="100" max="250" step="5">
+        <input type="range" id="qr-contrast" min="0" max="250" step="5">
       </div>
       <div class="qr-adjust-row">
         <label>Luminosit&agrave; <span id="qr-brightness-val"></span></label>
-        <input type="range" id="qr-brightness" min="80" max="220" step="5">
+        <input type="range" id="qr-brightness" min="0" max="220" step="5">
+      </div>
+      <label class="qr-invert-row"><input type="checkbox" id="qr-invert"> Inverti colori (negativo)</label>
+      <div class="qr-adjust-row" id="qr-zoom-row" style="display:none">
+        <label>Zoom <span id="qr-zoom-val"></span></label>
+        <input type="range" id="qr-zoom">
+      </div>
+      <label class="qr-invert-row" id="qr-manualfocus-row" style="display:none"><input type="checkbox" id="qr-manualfocus"> Fuoco manuale</label>
+      <div class="qr-adjust-row" id="qr-focus-row" style="display:none">
+        <label>Fuoco <span id="qr-focus-val"></span></label>
+        <input type="range" id="qr-focus">
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -39,6 +54,14 @@ function openQrScanner(targetInputId) {
   const video = overlay.querySelector('#qr-video');
   const status = overlay.querySelector('#qr-status');
   const switchBtn = overlay.querySelector('#qr-switch');
+  const zoomRow = overlay.querySelector('#qr-zoom-row');
+  const zoomEl = overlay.querySelector('#qr-zoom');
+  const zoomVal = overlay.querySelector('#qr-zoom-val');
+  const manualFocusRow = overlay.querySelector('#qr-manualfocus-row');
+  const manualFocusEl = overlay.querySelector('#qr-manualfocus');
+  const focusRow = overlay.querySelector('#qr-focus-row');
+  const focusEl = overlay.querySelector('#qr-focus');
+  const focusVal = overlay.querySelector('#qr-focus-val');
   let stream = null, rafId = null, stopped = false;
   let devices = [], devIdx = 0;
 
@@ -49,24 +72,39 @@ function openQrScanner(targetInputId) {
   const brightnessEl = overlay.querySelector('#qr-brightness');
   const contrastVal = overlay.querySelector('#qr-contrast-val');
   const brightnessVal = overlay.querySelector('#qr-brightness-val');
-  let qrAdjust = { contrast: 140, brightness: 120 };
+  const invertEl = overlay.querySelector('#qr-invert');
+  let qrAdjust = { contrast: 140, brightness: 120, invert: false };
   try { qrAdjust = Object.assign(qrAdjust, JSON.parse(localStorage.getItem('qr_adjust') || '{}')); } catch {}
   contrastEl.value = qrAdjust.contrast;
   brightnessEl.value = qrAdjust.brightness;
   contrastVal.textContent = qrAdjust.contrast + '%';
   brightnessVal.textContent = qrAdjust.brightness + '%';
-  const applyAdjust = () => { ctx.filter = `contrast(${qrAdjust.contrast}%) brightness(${qrAdjust.brightness}%)`; };
+  invertEl.checked = qrAdjust.invert;
+  // Applicato sia al canvas invisibile (quello che legge jsQR) sia al
+  // <video> a schermo: prima solo il canvas veniva filtrato, quindi
+  // muovere gli slider non produceva alcun cambiamento visibile - vedi
+  // conversazione. Il negativo (invert) aiuta sia a occhio con QR poco
+  // leggibili sia jsQR con QR a colori invertiti (es. generati in dark
+  // mode, moduli bianchi su fondo nero).
+  const applyAdjust = () => {
+    const f = `contrast(${qrAdjust.contrast}%) brightness(${qrAdjust.brightness}%)${qrAdjust.invert ? ' invert(1)' : ''}`;
+    ctx.filter = f;
+    video.style.filter = f;
+  };
+  const persist = () => localStorage.setItem('qr_adjust', JSON.stringify(qrAdjust));
   contrastEl.addEventListener('input', () => {
     qrAdjust.contrast = parseInt(contrastEl.value, 10);
     contrastVal.textContent = qrAdjust.contrast + '%';
-    applyAdjust();
-    localStorage.setItem('qr_adjust', JSON.stringify(qrAdjust));
+    applyAdjust(); persist();
   });
   brightnessEl.addEventListener('input', () => {
     qrAdjust.brightness = parseInt(brightnessEl.value, 10);
     brightnessVal.textContent = qrAdjust.brightness + '%';
-    applyAdjust();
-    localStorage.setItem('qr_adjust', JSON.stringify(qrAdjust));
+    applyAdjust(); persist();
+  });
+  invertEl.addEventListener('change', () => {
+    qrAdjust.invert = invertEl.checked;
+    applyAdjust(); persist();
   });
 
   const cleanup = () => {
@@ -104,23 +142,80 @@ function openQrScanner(targetInputId) {
   // scelto dal pulsante switch.
   function startStream(deviceId) {
     if (stream) stream.getTracks().forEach(t => t.stop());
-    const constraints = deviceId
-      ? { video: { deviceId: { exact: deviceId } } }
-      : { video: { facingMode: 'environment' } };
-    return navigator.mediaDevices.getUserMedia(constraints).then(s => {
+    // Risoluzione "ideal" alta: il browser sceglie comunque il massimo
+    // supportato dalla fotocamera se e' inferiore, ma di default (senza
+    // chiederla) molte webcam partono in un modo basso/720p che rende un
+    // QR piccolo poco piu' di una macchia di pixel - vedi conversazione.
+    const videoConstraints = deviceId
+      ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } };
+    return navigator.mediaDevices.getUserMedia({ video: videoConstraints }).then(s => {
       stream = s;
       video.srcObject = s;
       status.textContent = 'Ricerca QR code...';
 
+      const track = s.getVideoTracks()[0];
+      const caps = track && track.getCapabilities ? track.getCapabilities() : {};
       // Se la fotocamera espone il controllo hardware di esposizione, la
       // spingo un po' oltre il default: un QR piccolo/lontano ha moduli
       // sottili che l'auto-esposizione a volte espone troppo debolmente -
       // best-effort, silenzioso se il device non lo supporta.
-      const track = s.getVideoTracks()[0];
-      const caps = track && track.getCapabilities ? track.getCapabilities() : {};
       if (caps && caps.exposureCompensation && caps.exposureMode) {
         const target = Math.min(caps.exposureCompensation.max, (caps.exposureCompensation.max || 0) * 0.6);
         track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureCompensation: target }] }).catch(() => {});
+      }
+      // Zoom ottico/digitale nativo della fotocamera, dove disponibile
+      // (soprattutto smartphone): resta nascosto sulle webcam che non lo
+      // supportano, stesso pattern gia' usato per torcia/esposizione.
+      if (caps && caps.zoom && caps.zoom.max > caps.zoom.min) {
+        zoomRow.style.display = '';
+        zoomEl.min = caps.zoom.min;
+        zoomEl.max = caps.zoom.max;
+        zoomEl.step = caps.zoom.step || 1;
+        zoomEl.value = track.getSettings().zoom || caps.zoom.min;
+        zoomVal.textContent = 'x' + Number(zoomEl.value).toFixed(1);
+        zoomEl.oninput = () => {
+          track.applyConstraints({ advanced: [{ zoom: Number(zoomEl.value) }] }).catch(() => {});
+          zoomVal.textContent = 'x' + Number(zoomEl.value).toFixed(1);
+        };
+      } else {
+        zoomRow.style.display = 'none';
+      }
+      // Autofocus continuo esplicito: alcune fotocamere di default fanno
+      // solo un autofocus "a scatto" iniziale e poi restano ferme, il che
+      // e' un problema se durante la scansione ci si avvicina/allontana
+      // dal QR - forzare 'continuous' tiene il fuoco sempre aggiornato,
+      // best-effort se il device non lo supporta.
+      if (caps && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+        track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+      }
+      // Fuoco manuale come alternativa (utile se l'autofocus fatica su un
+      // QR molto piccolo o molto vicino): disponibile solo su alcuni
+      // dispositivi, il checkbox compare solo se la capability c'e'.
+      if (caps && Array.isArray(caps.focusMode) && caps.focusMode.includes('manual') && caps.focusDistance) {
+        manualFocusRow.style.display = '';
+        focusEl.min = caps.focusDistance.min;
+        focusEl.max = caps.focusDistance.max;
+        focusEl.step = caps.focusDistance.step || 1;
+        focusEl.value = track.getSettings().focusDistance || caps.focusDistance.min;
+        focusVal.textContent = focusEl.value;
+        manualFocusEl.checked = false;
+        focusRow.style.display = 'none';
+        manualFocusEl.onchange = () => {
+          focusRow.style.display = manualFocusEl.checked ? '' : 'none';
+          if (manualFocusEl.checked) {
+            track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: Number(focusEl.value) }] }).catch(() => {});
+          } else if (caps.focusMode.includes('continuous')) {
+            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+          }
+        };
+        focusEl.oninput = () => {
+          focusVal.textContent = focusEl.value;
+          track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: Number(focusEl.value) }] }).catch(() => {});
+        };
+      } else {
+        manualFocusRow.style.display = 'none';
+        focusRow.style.display = 'none';
       }
     });
   }
@@ -234,9 +329,11 @@ export function init(a) {
 
 export function showTab(name) {
   document.getElementById('tab-mesh').classList.toggle('hidden', name !== 'mesh');
-  document.getElementById('tab-setup').classList.toggle('hidden', name !== 'setup');
+  document.getElementById('tab-beacon').classList.toggle('hidden', name !== 'beacon');
+  document.getElementById('tab-device').classList.toggle('hidden', name !== 'device');
   document.getElementById('tb-mesh').classList.toggle('active', name === 'mesh');
-  document.getElementById('tb-setup').classList.toggle('active', name === 'setup');
+  document.getElementById('tb-beacon').classList.toggle('active', name === 'beacon');
+  document.getElementById('tb-device').classList.toggle('active', name === 'device');
 }
 
 export function setConnected(connected) {
@@ -253,26 +350,35 @@ export function setConnected(connected) {
   }
 }
 
+// Log seriale unico (stessa connessione USB) ma mostrato in due tab diversi
+// (Beacon e Dispositivo, vedi conversazione): non e' possibile spostare lo
+// stesso nodo DOM in due posti, quindi ogni riga viene clonata su tutti gli
+// elementi .log-panel presenti - restano sempre sincronizzati tra loro.
 export function log(line, kind) {
-  const panel = document.getElementById('log-panel');
-  const row = document.createElement('div');
-  row.className = 'log-row log-' + (kind || 'rx');
+  const panels = document.querySelectorAll('.log-panel');
+  if (!panels.length) return;
   const ts = new Date();
   const hh = String(ts.getHours()).padStart(2, '0');
   const mm = String(ts.getMinutes()).padStart(2, '0');
   const ss = String(ts.getSeconds()).padStart(2, '0');
-  row.textContent = `[${hh}:${mm}:${ss}] ${line}`;
-  panel.appendChild(row);
+  const text = `[${hh}:${mm}:${ss}] ${line}`;
+  panels.forEach(panel => {
+    const row = document.createElement('div');
+    row.className = 'log-row log-' + (kind || 'rx');
+    row.textContent = text;
+    panel.appendChild(row);
+    panel.scrollTop = panel.scrollHeight;
+  });
   logLines++;
   while (logLines > LOG_MAX) {
-    const first = panel.firstChild;
-    if (!first) break;
-    panel.removeChild(first);
+    panels.forEach(panel => { if (panel.firstChild) panel.removeChild(panel.firstChild); });
     logLines--;
   }
-  panel.scrollTop = panel.scrollHeight;
 }
-export function clearLog() { document.getElementById('log-panel').innerHTML = ''; logLines = 0; }
+export function clearLog() {
+  document.querySelectorAll('.log-panel').forEach(p => { p.innerHTML = ''; });
+  logLines = 0;
+}
 
 function startResetCountdown() {
   let n = 5;
@@ -330,7 +436,7 @@ function renderUsbModeBanner(usbMode) {
   // sui contenitori principali li disattiva tutti via CSS (pointer-events
   // none + opacita' ridotta), il firmware li rifiuta comunque con CFG:ERR
   // se per qualche motivo arrivano lo stesso (vedi usb_cfg_handle_line).
-  for (const id of ['discovered-box', 'nodes-box', 'tab-setup']) {
+  for (const id of ['discovered-box', 'nodes-box', 'tab-beacon', 'tab-device']) {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('usb-locked', !usbMode);
   }

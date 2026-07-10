@@ -162,14 +162,15 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   setTimeout(() => btn.classList.remove('spinning'), 600);
   requestState(); requestStatus();
 });
-document.getElementById('btn-clearlog').addEventListener('click', () => ui.clearLog());
+document.querySelectorAll('.btn-clearlog').forEach(btn => btn.addEventListener('click', () => ui.clearLog()));
 document.getElementById('btn-theme').addEventListener('click', () => {
   document.documentElement.classList.toggle('light');
   localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');
 });
 
 document.getElementById('tb-mesh').addEventListener('click', () => ui.showTab('mesh'));
-document.getElementById('tb-setup').addEventListener('click', () => ui.showTab('setup'));
+document.getElementById('tb-beacon').addEventListener('click', () => ui.showTab('beacon'));
+document.getElementById('tb-device').addEventListener('click', () => ui.showTab('device'));
 
 ui.init({ sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw });
 

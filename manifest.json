@@ -1,6 +1,6 @@
 {
-  "name": "Mesh Gateway Configurator",
-  "short_name": "MeshGate",
+  "name": "Terminal Controller",
+  "short_name": "Terminal",
   "description": "Configuratore BLE Mesh per gateway ESP32-S3",
   "start_url": "./",
   "display": "standalone",
