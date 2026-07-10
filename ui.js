@@ -25,6 +25,7 @@ function openQrScanner(targetInputId) {
         <button type="button" class="iconbtn qr-switch-btn" id="qr-switch" style="display:none" title="Cambia fotocamera"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 0 1 15-8.66"/><path d="M22 12a10 10 0 0 1-15 8.66"/><path d="M17 2v5h-5"/><path d="M7 22v-5h5"/></svg></button>
         <div class="qr-guide">
           <div class="qr-guide-grid"></div>
+          <div class="qr-guide-laser"></div>
           <span class="qr-guide-corner tl"></span><span class="qr-guide-corner tr"></span>
           <span class="qr-guide-corner bl"></span><span class="qr-guide-corner br"></span>
         </div>
@@ -111,7 +112,10 @@ function openQrScanner(targetInputId) {
     stopped = true;
     if (rafId) cancelAnimationFrame(rafId);
     if (stream) stream.getTracks().forEach(t => t.stop());
-    overlay.remove();
+    // Esce con la stessa "grazia" con cui e' entrato (fade+scorrimento verso
+    // il basso), invece di sparire di scatto - vedi conversazione.
+    overlay.classList.add('qr-modal-closing');
+    overlay.querySelector('.qr-modal-box').addEventListener('animationend', () => overlay.remove(), { once: true });
   };
   overlay.querySelector('#qr-close').addEventListener('click', cleanup);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(); });
