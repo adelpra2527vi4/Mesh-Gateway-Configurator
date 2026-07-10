@@ -19,6 +19,9 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:180px}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px color-mix(in srgb,var(--red) 22%,transparent)}
 .dot.on{background:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 22%,transparent)}
+/* Modalita' USB/config (BOOT premuto sul gateway): stesso blu del LED
+   fisico invece del verde di modalita' normale - vedi conversazione. */
+.dot.on.usbmode{background:#2f7bf6;box-shadow:0 0 0 4px color-mix(in srgb,#2f7bf6 22%,transparent)}
 .topbar h1{margin:0;font-size:1.18rem;letter-spacing:-.01em;font-weight:700}
 .navbtn,.btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-size:.83rem;font-weight:600;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:7px 13px;background:var(--surface);cursor:pointer;font-family:inherit;line-height:1;transition:border-color .12s,color .12s}
 .btn:hover,.navbtn:hover{border-color:var(--accent);color:var(--accent)}
@@ -67,6 +70,14 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .badge{display:inline-flex;align-items:center;font-size:.72rem;color:var(--muted);border:1px solid var(--border);border-radius:7px;padding:2px 7px;font-weight:600}
 .badge.good{color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,var(--border))}
 .badge.warn{color:var(--yellow);border-color:color-mix(in srgb,var(--yellow) 45%,var(--border))}
+.badge.bad{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--border));background:color-mix(in srgb,var(--red) 12%,transparent)}
+/* Nodo irraggiungibile (nessuna risposta da tempo, vedi node_is_online in
+   main.c): controlli disattivati e leggermente sbiaditi, come un'anteprima
+   "questi dati sono l'ultimo stato noto, non affidabili adesso" - non li
+   blocco del tutto (usb-locked) perche' l'utente potrebbe comunque voler
+   rimuovere/rinominare un nodo offline. */
+.node-offline{opacity:.6}
+.node-offline .node-head{opacity:1}
 
 /* Modalita' USB non attiva (vedi ui.js renderUsbModeBanner): blocca i
    controlli interattivi dentro i contenitori marcati, il device li
@@ -101,6 +112,13 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .section-title::after{content:"";flex:1;height:1px;background:var(--border)}
 .dev-card{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow)}
 .dev-card .grow{flex:1;min-width:160px}
+/* Variante colonna per le card sniffer: header (mac/nome/rssi + azioni) piu'
+   le righe dei byte del payload sotto, impilate invece che una accanto
+   all'altra come farebbe il layout riga di .dev-card - vedi conversazione. */
+.dev-card.sniff-card{flex-direction:column;align-items:stretch;gap:6px}
+.sniff-card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sniff-card-head .rssi{margin-left:auto}
+.sniff-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
 .rssi{font-size:.78rem;color:var(--muted)}
 .dev-name{font-weight:700;font-size:1.02rem;color:var(--accent,var(--green));padding:2px 8px;border-radius:7px;background:color-mix(in srgb,var(--accent,var(--green)) 14%,transparent);border:1px solid color-mix(in srgb,var(--accent,var(--green)) 35%,var(--border))}
 #update-popup{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:.88rem;font-weight:600;animation:update-popup-in .25s ease}
@@ -112,20 +130,63 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 
 .field{display:flex;align-items:center;gap:10px;margin:0 0 16px;flex-wrap:wrap}
 .field label{font-weight:600;font-size:.9em}
-.relays{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.relay-btn{flex:1 1 96px;padding:12px 18px;border-radius:10px;border:1px solid var(--border);cursor:pointer;font-weight:600;background:var(--surface);color:var(--text);font-family:inherit;font-size:.9em;min-width:96px}
-.relay-btn:hover{border-color:var(--border2)}
-.relay-btn.on{background:var(--green);color:#06140f;border-color:var(--green)}
-.checks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-.checks label{flex:1 1 140px;display:flex;align-items:center;gap:8px;font-size:.9em;border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:9px 12px;cursor:pointer}
-.checks input{accent-color:var(--accent);width:16px;height:16px}
-.slotrow{border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:11px 13px;margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.slotrow .slotn{font-weight:700;font-size:.82em;color:var(--muted);min-width:54px}
-.slotrow .lab{font-size:.78em;color:var(--muted)}
-.sensor-card{border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:10px 13px;margin:8px 0;font-family:ui-monospace,Menlo,monospace;font-size:.82em;color:var(--text);display:flex;align-items:center;gap:10px}
-.sensor-card::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
-.sensor-card.offline{opacity:.55}
-.sensor-card.offline::before{background:var(--muted)}
+/* Relè disabilitato (non presente fisicamente): sbiadito come un nodo
+   offline ma classe separata - significati diversi (qui e' una scelta di
+   configurazione, non un problema di raggiungibilita') - vedi
+   conversazione ("rifai la pagina dispositivo"). */
+.relay-disabled{opacity:.55}
+/* Pulsante toggle grande per relè: e' l'azione principale della card,
+   deve essere il primo elemento che salta all'occhio invece di un piccolo
+   .btn sm in mezzo a una riga - vedi conversazione. */
+.relay-toggle-btn{display:block;width:100%;margin-top:10px;padding:22px 12px;border-radius:12px;border:2px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;font-size:1.1rem;font-weight:700;text-align:center;cursor:pointer;transition:background .15s,border-color .15s}
+.relay-toggle-btn:hover{border-color:var(--border2)}
+.relay-toggle-btn.on{background:var(--green);border-color:var(--green);color:#06140f}
+.relay-toggle-btn.disabled{cursor:default;background:var(--surface2);color:var(--muted);opacity:.6}
+/* Card relè in una riga sola invece che nella griglia a 2 colonne condivisa
+   con nodi mesh/beacon: sono poche (tipico 4-8) e quadrate, stanno bene
+   affiancate tutte insieme - vedi conversazione. Numero relè ingrandito,
+   e' l'unica etichetta della card quindi puo' permettersi di essere grande. */
+#relays{display:flex;flex-wrap:wrap;gap:14px}
+.relay-card{flex:0 0 130px;text-align:center}
+.relay-num{font-size:2.1rem;font-weight:800;color:var(--text);line-height:1}
+/* Toggle switch per "Abilitato" al posto del checkbox nudo con label a
+   fianco - vedi conversazione. Basato su un checkbox reale nascosto (resta
+   accessibile/nativo) con una pillola disegnata sopra via ::before. */
+.relay-switch-row{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;margin-top:12px;font-size:.85rem;color:var(--muted)}
+.switch{position:relative;display:inline-block;width:38px;height:22px;flex:none}
+.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.switch-track{position:absolute;inset:0;background:var(--border2);border-radius:999px;transition:background .15s}
+.switch-track::before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.4);transition:transform .15s}
+.switch input:checked + .switch-track{background:var(--accent)}
+.switch input:checked + .switch-track::before{transform:translateX(16px)}
+.switch input:focus-visible + .switch-track{outline:2px solid var(--accent);outline-offset:2px}
+/* Card slot beacon, stessa identita' visiva delle card nodo mesh (.node):
+   bordo/sfondo/ombra condivisi, campi impilati verticalmente invece della
+   vecchia riga singola che diventava illeggibile stretta - vedi
+   conversazione ("fai delle card come nella mesh"). */
+.slot-field{margin:8px 0}
+.slot-field label{display:block;font-size:.75rem;color:var(--muted);margin-bottom:3px}
+.slot-field input{width:100%}
+.sensor-live-line{font-family:ui-monospace,Menlo,monospace;font-size:.82em;display:flex;align-items:center;gap:8px;margin:8px 0;padding:7px 10px;background:var(--surface2);border-radius:8px}
+.sensor-live-line::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
+.sensor-live-line.offline{opacity:.6}
+.sensor-live-line.offline::before{background:var(--muted)}
+/* Chip per ogni valore letto dal beacon (NOME=valore della regola di
+   decodifica), invece della stringa grezza "temp=24.5;hum=60;rssi=-55".
+   Dimensioni aumentate e sfondo accent-tinted: e' il dato che interessa a
+   colpo d'occhio, deve "pesare" di piu' della configurazione sotto -
+   vedi conversazione ("dai piu' risalto ai dati"). */
+.reading-row{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.reading-chip{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:color-mix(in srgb,var(--accent) 10%,var(--surface2));border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));border-radius:10px;padding:8px 14px;min-width:64px}
+.reading-key{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.reading-val{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:1.25rem;color:var(--accent)}
+.reading-chip-rssi{opacity:.75;background:var(--surface2);border-color:var(--border);padding:6px 12px}
+.reading-chip-rssi .reading-val{color:var(--text);font-weight:600;font-size:.85rem}
+/* Configurazione (nome/mac/regole) demota a pannello richiudibile: niente
+   bordo/sfondo proprio, e' gia' dentro la card .node. */
+.slot-edit{border:none;background:transparent;padding:0;margin:10px 0 0}
+.slot-edit summary{padding:6px 0;font-size:.8em;color:var(--muted)}
+.slot-edit[open]{padding-bottom:0}
 .byte{border:1px solid var(--border);border-radius:5px;padding:3px 6px;margin:2px;cursor:pointer;font-family:ui-monospace,monospace;display:inline-block;background:var(--surface2);color:var(--text);font-size:.82em}
 .byte:hover{border-color:var(--accent)}
 .byte.changed{background:var(--red);color:#fff;border-color:var(--red)}
@@ -156,11 +217,11 @@ details[open] summary::before{content:'\25BE '}
    sfruttare lo schermo in orizzontale invece di impilare tutto in colonna
    unica - vedi conversazione. */
 
-/* Tab Mesh: dispositivi rilevati e nodi sempre su 2 colonne (card piu'
-   larghe, come richiesto) - sotto una certa larghezza torna a colonna
-   unica invece di stringere troppo le card. */
-#discovered-box, #nodes-box{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
-@media (max-width:760px){ #discovered-box, #nodes-box{grid-template-columns:1fr} }
+/* Griglia riutilizzabile a 2 colonne per qualunque elenco di card (nodi
+   mesh, slot beacon, dispositivi sniffer): sotto una certa larghezza torna
+   a colonna unica invece di stringere troppo le card - vedi conversazione. */
+#discovered-box, #nodes-box, .cards-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+@media (max-width:760px){ #discovered-box, #nodes-box, .cards-grid{grid-template-columns:1fr} }
 #discovered-box .section-title, #nodes-box .section-title{grid-column:1/-1}
 .node,.dev-card{margin:0}
 /* Distacco netto tra "rilevati" e "gia' provisionati": il primo box non ha
@@ -168,10 +229,6 @@ details[open] summary::before{content:'\25BE '}
 #discovered-box{margin-bottom:0}
 .section-divider{border:none;border-top:1px solid var(--border);margin:28px 0 0}
 
-/* Tab Setup: Rel\E8  (colonna stretta) e Sniffer BLE (colonna larga, ha
-   bisogno di spazio per ricerca+lista) fianco a fianco. */
-.setup-top-layout{margin-top:18px}
-.setup-relays-col{flex:0 0 300px}
 /* flex-grow:0 (era 1): con la pagina allargata, "cresci per riempire lo
    spazio" trasformava il riquadro (bordo+sfondo del <details>) in un box
    enorme quasi vuoto - vedi conversazione. Resta della sua larghezza

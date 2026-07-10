@@ -163,6 +163,36 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   requestState(); requestStatus();
 });
 document.querySelectorAll('.btn-clearlog').forEach(btn => btn.addEventListener('click', () => ui.clearLog()));
+document.querySelectorAll('.btn-copylog').forEach(btn => btn.addEventListener('click', async () => {
+  // I pannelli .log-panel sono mirror dello stesso stream (vedi ui.js log()):
+  // basta leggere il primo che c'e' nella pagina, contengono lo stesso testo.
+  const panel = document.querySelector('.log-panel');
+  const text = panel ? panel.innerText : '';
+  const flash = (ok) => {
+    const old = btn.textContent;
+    btn.textContent = ok ? 'Copiato!' : 'Errore copia';
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  };
+  // navigator.clipboard richiede un contesto sicuro (HTTPS o localhost):
+  // stesso problema gia' risolto nel pannello debug di Manager.py - fallback
+  // con textarea nascosta + execCommand('copy') se manca l'API.
+  if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); flash(true); } catch { flash(false); }
+    return;
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    flash(ok);
+  } catch { flash(false); }
+}));
 document.getElementById('btn-theme').addEventListener('click', () => {
   document.documentElement.classList.toggle('light');
   localStorage.setItem('theme', document.documentElement.classList.contains('light') ? 'light' : 'dark');

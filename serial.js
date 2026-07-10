@@ -169,7 +169,7 @@ export class GatewaySerial extends EventTarget {
           i: parseInt(fields.i, 10), base: fields.base,
           cfg: fields.cfg === '1', fail: fields.fail === '1', sw: fields.sw === '1',
           kind: parseInt(fields.kind, 10), grp: fields.grp === '1', paired: fields.paired === '1',
-          lamp_elem: parseInt(fields.lamp_elem, 10), name: fields.name || '',
+          lamp_elem: parseInt(fields.lamp_elem, 10), online: fields.online !== '0', name: fields.name || '',
           elems: [], lvls: [], sensor: null,
         });
         break;

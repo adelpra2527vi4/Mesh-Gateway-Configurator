@@ -341,6 +341,7 @@ export function setConnected(connected) {
   const dot = document.getElementById('conn-dot');
   btn.textContent = connected ? 'Disconnetti' : 'Connetti';
   dot.classList.toggle('on', connected);
+  if (!connected) dot.classList.remove('usbmode');
   document.getElementById('main-content').style.display = connected ? '' : 'none';
   if (!connected) {
     lastState = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
@@ -417,6 +418,14 @@ export function renderState(state) {
 const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn'];
 
 function renderUsbModeBanner(usbMode) {
+  // Il pallino accanto al titolo rispecchia il colore del LED fisico
+  // sull'ESP (rgb_led_set in main.c): verde in modalita' normale, blu in
+  // modalita' USB/config (BOOT tenuto premuto) - prima era sempre verde a
+  // connessione avvenuta, senza distinguere le due modalita' - vedi
+  // conversazione.
+  const dot = document.getElementById('conn-dot');
+  if (dot) dot.classList.toggle('usbmode', !!usbMode);
+
   const banner = document.getElementById('banner');
   if (banner) {
     if (!usbMode) {
@@ -627,6 +636,14 @@ function renderNode(nd) {
 
   const stCls = nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait');
   const stTxt = nd.cfg ? 'OK' : (nd.fail ? 'Errore' : 'Config...');
+  // "OK" sopra riguarda solo il bind/config completato una volta, non dice
+  // se il nodo risponde ancora adesso - un nodo scollegato dalla corrente
+  // restava per sempre "OK" con l'ultimo stato noto, senza nessun segnale
+  // che fosse irraggiungibile. offlineBadge e' un indicatore separato,
+  // basato sull'ultima risposta reale vista dal firmware - vedi
+  // conversazione (main.c node_is_online/s_node_last_seen_us).
+  const offline = nd.cfg && !nd.online;
+  const offlineBadge = offline ? `<span class="badge bad">Offline</span>` : '';
   const sel = `<select id="kind_${nd.i}" data-act="setkind" data-node="${nd.i}">
       <option value="0" ${nd.kind===0?'selected':''}>Lampada</option>
       <option value="1" ${nd.kind===1?'selected':''}>Sensore</option></select>`;
@@ -636,7 +653,7 @@ function renderNode(nd) {
     : '';
   const rbtn = nd.kind === 0 ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
 
-  let head = `<div class="node"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span></div>`
+  let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span>${offlineBadge}</div>`
     + `<div class="node-meta">${sel} ${rbtn} ${grpBadge} <span style="margin-left:auto">${fbtn}</span></div>`;
 
   if (!nd.cfg) return head + `<div class="empty" style="margin-top:10px">Non ancora configurato.</div></div>`;
@@ -854,37 +871,77 @@ export function onCmdResult(type, cmd) {
   }
 }
 
+// Prima erano due liste separate e slegate (checkbox "abilitato" in una
+// sezione, pulsante on/off degli abilitati in un'altra sotto) - per capire
+// lo stato di un relè bisognava guardare in due punti diversi della pagina.
+// Ora ogni relè e' una card sola, stile coerente col resto dell'app (nodi
+// mesh/slot beacon) - vedi conversazione ("rifai la pagina dispositivo").
 function renderRelays() {
   const relays = lastStatus.relays || [];
-  const liveBox = document.getElementById('relays');
-  const liveHtml = relays.filter(r => r.enabled).map(r =>
-    `<button class="relay-btn ${r.on?'on':''}" data-act="relayset" data-n="${r.n}" data-on="${r.on?1:0}">Rel&egrave; ${r.n+1}</button>`
-  ).join('');
-  liveBox.innerHTML = liveHtml || '<i class="muted">Nessun rel&egrave; abilitato</i>';
-  liveBox.querySelectorAll('[data-act="relayset"]').forEach(b => {
+  const box = document.getElementById('relays');
+  if (!relays.length) { box.innerHTML = '<i class="muted">Nessun rel&egrave; rilevato</i>'; return; }
+  box.innerHTML = relays.map(r => {
+    // Pulsante toggle grande (era un .btn sm minuscolo in mezzo alla riga):
+    // e' l'azione principale della card, deve pesare visivamente di piu' -
+    // vedi conversazione ("pulsantoni piu' grandi").
+    // Disabilitato: stesso aspetto del pulsante "Spento" ma non cliccabile
+    // e grigio, invece di un dashed-border con testo diverso ("Non
+    // presente") che sembrava un elemento a se' - vedi conversazione.
+    const toggleBtn = r.enabled
+      ? `<button class="relay-toggle-btn${r.on ? ' on' : ''}" data-act="relayset" data-n="${r.n}" data-on="${r.on ? 1 : 0}">${r.on ? 'Acceso' : 'Spento'}</button>`
+      : `<div class="relay-toggle-btn disabled">Spento</div>`;
+    return `<div class="node relay-card${r.enabled ? '' : ' relay-disabled'}">
+      <div class="relay-num">${r.n + 1}</div>
+      ${toggleBtn}
+      <label class="relay-switch-row">
+        <span>${r.enabled ? 'Abilitato' : 'Disabilitato'}</span>
+        <span class="switch"><input type="checkbox" data-act="relaycfg" data-n="${r.n}" data-on="${r.on ? 1 : 0}" ${r.enabled ? 'checked' : ''}><span class="switch-track"></span></span>
+      </label>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-act="relayset"]').forEach(b => {
     b.addEventListener('click', () => {
       const newVal = b.dataset.on === '1' ? 0 : 1;
       api.sendCmd(`CFG:RELAYSET;n=${b.dataset.n};val=${newVal}`);
       api.afterStatusRefresh();
     });
   });
-
-  const checksBox = document.getElementById('relay-checks');
-  checksBox.innerHTML = relays.map(r =>
-    `<label><input type="checkbox" data-act="relaycfg" data-n="${r.n}" ${r.enabled?'checked':''}> Rel&egrave; ${r.n+1}</label>`
-  ).join('');
-  checksBox.querySelectorAll('[data-act="relaycfg"]').forEach(c => {
-    c.addEventListener('change', () => api.sendCmd(`CFG:RELAYCFG;n=${c.dataset.n};enabled=${c.checked?1:0}`));
+  box.querySelectorAll('[data-act="relaycfg"]').forEach(c => {
+    c.addEventListener('change', () => {
+      // Disabilitare un relè che era acceso non deve lasciarlo alimentato:
+      // manda anche lo spegnimento fisico, non solo il flag "abilitato" -
+      // vedi conversazione.
+      if (!c.checked && c.dataset.on === '1') {
+        api.sendCmd(`CFG:RELAYSET;n=${c.dataset.n};val=0`);
+      }
+      api.sendCmd(`CFG:RELAYCFG;n=${c.dataset.n};enabled=${c.checked?1:0}`);
+      api.afterStatusRefresh();
+    });
   });
 }
 
+// "last" arriva dal firmware come "chiave=valore;chiave2=valore2;...;rssi=N"
+// (ble_classic_handler.c, un pezzo per ogni NOME della regola di decodifica
+// piu' l'rssi in coda): prima veniva mostrato cosi' com'era, illeggibile.
+// Qui diventa una fila di chip valore/etichetta, l'RSSI evidenziato diverso
+// dagli altri (e' un dato di contesto, non una lettura del sensore) - vedi
+// conversazione.
+function renderSensorReadings(lastStr) {
+  const pairs = (lastStr || '').split(';').filter(Boolean).map(p => {
+    const eq = p.indexOf('=');
+    return eq < 0 ? null : [p.slice(0, eq), p.slice(eq + 1)];
+  }).filter(Boolean);
+  if (!pairs.length) return '';
+  return `<div class="reading-row">` + pairs.map(([k, v]) => {
+    const isRssi = k.toLowerCase() === 'rssi';
+    return `<div class="reading-chip${isRssi ? ' reading-chip-rssi' : ''}">`
+      + `<span class="reading-key">${isRssi ? 'RSSI' : k}</span>`
+      + `<span class="reading-val">${v}${isRssi ? ' dBm' : ''}</span></div>`;
+  }).join('') + `</div>`;
+}
+
 function renderSensorSlots() {
-  const liveBox = document.getElementById('sensors-live');
   const list = lastStatus.blesensors || [];
-  const liveHtml = list.filter(s => s.configured).map(s =>
-    `<div class="sensor-card ${s.last?'':'offline'}">Slot ${s.slot+1}${s.name?(' ('+s.name+')'):''}: ${s.last || 'in attesa beacon...'}</div>`
-  ).join('');
-  liveBox.innerHTML = liveHtml || '<i class="muted">Nessun sensore configurato</i>';
 
   // Non ridisegnare i campi se l'utente li ha modificati ma non ancora salvato:
   // il ridisegno sovrascrive i valori appena scritti (da "Usa MAC", "Usa regola"
@@ -892,15 +949,45 @@ function renderSensorSlots() {
   if (sensorSlotsDirty) return;
 
   const box = document.getElementById('sensor-slots');
+  // Stesso "gioco di velocita'" gia' visto col menu Lampada/Sensore: il
+  // refresh periodico (ogni ~2s, CFG:STATUS) ridisegna la card e un
+  // <details> aperto da meno di un secondo si ritrova chiuso di scatto,
+  // prima ancora che l'utente riesca a leggerne il contenuto - vedi
+  // conversazione. Se un pannello "Configurazione" e' aperto, salta il
+  // render finche' l'utente non lo chiude da solo.
+  if (box && box.querySelector('.slot-edit[open]')) return;
   let h = '';
   for (let i = 0; i < 8; i++) {
     const s = list.find(x => x.slot === i) || { slot: i, name: '', mac: '', rules: '' };
-    h += `<div class="slotrow"><span class="slotn">Slot ${i+1}</span>
-      <span class="lab">nome</span> <input id="bn_${i}" value="${s.name||''}" placeholder="es. Cucina" size="12">
-      <span class="lab">mac</span> <input id="bm_${i}" value="${s.mac||''}" placeholder="aabbccddeeff" size="18">
-      <span class="lab">regole</span> <input id="bg_${i}" value="${s.rules||''}" placeholder="SVC,181A,0,2,S100,temp" size="32">
-      <button type="button" class="btn sm" data-act="sensorsave" data-slot="${i}">Salva</button>
-      <button type="button" class="btn danger sm" data-act="sensorreset" data-slot="${i}">Elimina</button></div>`;
+    const hasData = !!(s.mac);
+    // Stato live integrato nella card (prima era una lista separata sopra,
+    // scollegata visivamente dai campi dello stesso slot) - vedi
+    // conversazione ("card come nella mesh" anche per i beacon).
+    const pill = !hasData
+      ? `<span class="pill wait">Vuoto</span>`
+      : (s.last ? `<span class="pill ok">Attivo</span>` : `<span class="pill err">Offline</span>`);
+    const liveLine = hasData
+      ? (s.last ? renderSensorReadings(s.last) : `<div class="sensor-live-line offline">in attesa beacon...</div>`)
+      : `<div class="sensor-live-line offline">Slot non configurato</div>`;
+    // Il dato letto e' la cosa che interessa a colpo d'occhio, la
+    // configurazione (nome/mac/regole) e' roba da toccare una volta e poi
+    // dimenticare - demota a pannello richiudibile invece di stare sempre
+    // in vista quanto i valori letti - vedi conversazione ("dai piu'
+    // risalto ai dati").
+    h += `<div class="node">
+      <div class="node-head"><span class="idx">Slot ${i+1}${s.name?(': '+s.name):''}</span>${pill}</div>
+      ${liveLine}
+      <details class="slot-edit">
+        <summary>Configurazione</summary>
+        <div class="slot-field"><label>Nome</label><input id="bn_${i}" value="${s.name||''}" placeholder="es. Cucina"></div>
+        <div class="slot-field"><label>MAC</label><input id="bm_${i}" value="${s.mac||''}" placeholder="aabbccddeeff"></div>
+        <div class="slot-field"><label>Regole</label><input id="bg_${i}" value="${s.rules||''}" placeholder="SVC,181A,0,2,S100,temp"></div>
+        <div class="row-btns">
+          <button type="button" class="btn sm" data-act="sensorsave" data-slot="${i}">Salva</button>
+          <button type="button" class="btn danger sm" data-act="sensorreset" data-slot="${i}">Elimina</button>
+        </div>
+      </details>
+    </div>`;
   }
   box.innerHTML = h;
   // Qualsiasi digitazione nei campi attiva il flag "dirty"
@@ -908,6 +995,13 @@ function renderSensorSlots() {
   box.querySelectorAll('[data-act="sensorsave"]').forEach(b => {
     b.addEventListener('click', () => {
       sensorSlotsDirty = false; // permette il ridisegno con i nuovi dati dall'ESP
+      // Chiude il pannello "Configurazione": resterebbe aperto altrimenti,
+      // e la protezione anti-refresh aggiunta per non farlo richiudere da
+      // solo (vedi conversazione) bloccherebbe ANCHE il render con la
+      // conferma del salvataggio, dando l'impressione che "Salva" non
+      // faccia nulla.
+      const details = b.closest('.slot-edit');
+      if (details) details.open = false;
       const i = b.dataset.slot;
       const mac = document.getElementById('bm_' + i).value.trim();
       const rules = document.getElementById('bg_' + i).value.trim();
@@ -920,6 +1014,8 @@ function renderSensorSlots() {
     b.addEventListener('click', () => {
       if (!confirm(`Svuotare lo slot ${parseInt(b.dataset.slot)+1}?`)) return;
       sensorSlotsDirty = false;
+      const details = b.closest('.slot-edit');
+      if (details) details.open = false;
       api.sendCmd(`CFG:RESETSLOT;slot=${b.dataset.slot}`);
       api.afterStatusRefresh();
     });
@@ -990,13 +1086,23 @@ function renderSnifferList() {
     : total > 0
       ? `<span style="font-size:.85em;opacity:.6"><i>Sniffer fermo — ${total} dispositivi congelati. "Pulisci lista" per azzerare.</i></span>`
       : '';
-  let h = statusLine ? `<p style="margin:0 0 8px">${statusLine}</p>` : '';
+  let h = statusLine ? `<p style="margin:0 0 8px;grid-column:1/-1">${statusLine}</p>` : '';
   const sorted = [...filtered].sort((a, b) => b.rssi - a.rssi); // dal più vicino al più lontano
   sorted.forEach(d => {
-    h += `<div class="dev-card"><div><b>${d.mac}</b> ${d.name?('('+d.name+')'):''} - ${d.rssi} dBm
-        <button type="button" data-act="usemac" data-mac="${d.mac}">Usa MAC</button>
-        <button type="button" data-act="copymac" data-mac="${d.mac}">Copia MAC</button>
-        <button type="button" data-act="togglepin" data-mac="${d.mac}">${pinnedMac===d.mac?'Mostra tutti':'Isola sensore'}</button></div>`;
+    // Stessa gerarchia visiva della lista "dispositivi rilevati" del tab
+    // Mesh: nome in evidenza (.dev-name) sopra, MAC monospace sotto, invece
+    // di MAC-poi-nome-tra-parentesi - vedi conversazione.
+    const nameStr = d.name
+      ? `<span class="dev-name">${d.name}</span>`
+      : `<span class="muted">(nome sconosciuto)</span>`;
+    h += `<div class="dev-card sniff-card">
+      <div class="sniff-card-head">${nameStr}<span class="rssi">${d.rssi} dBm</span></div>
+      <div class="addr" style="font-family:ui-monospace,Menlo,monospace">${d.mac}</div>
+      <div class="sniff-card-actions">
+        <button type="button" class="btn sm" data-act="usemac" data-mac="${d.mac}">Usa MAC</button>
+        <button type="button" class="btn sm" data-act="copymac" data-mac="${d.mac}">Copia MAC</button>
+        <button type="button" class="btn sm" data-act="togglepin" data-mac="${d.mac}">${pinnedMac===d.mac?'Mostra tutti':'Isola sensore'}</button>
+      </div>`;
     if (d.svc_hex) h += renderByteRow(d.mac, 'SVC', d.svc_uuid, d.svc_hex);
     if (d.mfr_hex) h += renderByteRow(d.mac, 'MFR', '0', d.mfr_hex);
     h += '</div>';

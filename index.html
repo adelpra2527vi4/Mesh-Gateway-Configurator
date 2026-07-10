@@ -25,16 +25,16 @@
 
 <div id="main-content" style="display:none">
   <div class="tabbar">
-    <button type="button" class="tabbtn active" id="tb-mesh">Mesh</button>
+    <button type="button" class="tabbtn active" id="tb-device">Dispositivo</button>
+    <button type="button" class="tabbtn" id="tb-mesh">Mesh</button>
     <button type="button" class="tabbtn" id="tb-beacon">Beacon</button>
-    <button type="button" class="tabbtn" id="tb-device">Dispositivo</button>
   </div>
 
   <div id="reset-countdown"></div>
   <div id="banner"></div>
 
   <!-- ===================== TAB MESH ===================== -->
-  <div id="tab-mesh" class="tabpanel">
+  <div id="tab-mesh" class="tabpanel hidden">
     <div class="stats">
       <div class="stat"><div class="num" id="st-lamps">&ndash;</div><div class="lbl">Lampade</div></div>
       <div class="stat"><div class="num" id="st-sens">&ndash;</div><div class="lbl">Sensori</div></div>
@@ -76,11 +76,10 @@
         <button type="button" id="sniffclearbtn" class="btn sm">Pulisci lista</button>
       </p>
       <p><input type="text" id="sniffsearch" placeholder="Cerca per mac o nome..."></p>
-      <div id="snifflist"><i>Sniffer fermo.</i></div>
+      <div id="snifflist" class="cards-grid"><i>Sniffer fermo.</i></div>
     </details>
     <p><button type="button" id="btn-resetallsensors" class="btn danger sm">Pulisci tutti gli slot</button></p>
-    <div id="sensors-live"></div>
-    <div id="sensor-slots"></div>
+    <div id="sensor-slots" class="cards-grid"></div>
     </div>
 
     <aside class="rule-help">
@@ -124,31 +123,36 @@
 
     <details open style="margin-top:20px">
       <summary>Log seriale</summary>
-      <div class="row" style="margin-bottom:8px"><button class="btn sm btn-clearlog">Pulisci log</button></div>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn sm btn-clearlog">Pulisci log</button>
+        <button class="btn sm btn-copylog">Copia log</button>
+      </div>
       <div class="log-panel"></div>
     </details>
   </div>
 
   <!-- ===================== TAB DISPOSITIVO ===================== -->
-  <div id="tab-device" class="tabpanel hidden">
-    <div class="field">
-      <label>Nome hub</label>
-      <input type="text" id="hubname-input" placeholder="Hub-1">
-      <button id="btn-sethubname" class="btn sm">Salva</button>
-      <span class="muted" id="hubname-msg"></span>
+  <div id="tab-device" class="tabpanel">
+    <div class="node" style="margin-bottom:20px">
+      <div class="node-head"><span class="idx">Nome hub</span></div>
+      <div class="field" style="margin:8px 0 0">
+        <input type="text" id="hubname-input" placeholder="Hub-1" style="flex:1;min-width:160px">
+        <button id="btn-sethubname" class="btn sm">Salva</button>
+        <span class="muted" id="hubname-msg"></span>
+      </div>
     </div>
 
-    <div class="setup-top-layout">
-    <h3 style="margin-top:6px">Rel&egrave; abilitati <span class="muted">&mdash; presenza fisica del carico</span></h3>
-    <div class="checks" id="relay-checks"></div>
+    <div class="bar" style="margin:8px 0 4px">
+      <span class="section-title" style="margin:0">REL&Egrave;</span>
     </div>
-
-    <h3>Rel&egrave; <span class="muted">&mdash; tocca per accendere/spegnere</span></h3>
-    <div class="relays" id="relays"></div>
+    <div id="relays"></div>
 
     <details open style="margin-top:20px">
       <summary>Log seriale</summary>
-      <div class="row" style="margin-bottom:8px"><button class="btn sm btn-clearlog">Pulisci log</button></div>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn sm btn-clearlog">Pulisci log</button>
+        <button class="btn sm btn-copylog">Copia log</button>
+      </div>
       <div class="log-panel"></div>
     </details>
   </div>
