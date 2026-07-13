@@ -188,6 +188,11 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
    dentro il pannello) la richiede. */
 .usb-locked button, .usb-locked input, .usb-locked select, .usb-locked textarea,
 .usb-locked .switch{opacity:.5;pointer-events:none}
+/* Pulisci/Copia log: azioni locali sul testo gia' mostrato, non toccano il
+   device - devono restare sempre utilizzabili anche in modalita' normale
+   (non richiedono affatto lo sblocco USB) - vedi conversazione ("in
+   modalita' verde non si puo' copiare il log"). */
+.usb-locked .btn-clearlog, .usb-locked .btn-copylog{opacity:1;pointer-events:auto}
 
 .name-input{font-size:1rem;font-weight:700;border:1px solid transparent;border-radius:8px;padding:5px 8px;width:160px;max-width:48vw;background:transparent;color:var(--text)}
 .name-input:hover{border-color:var(--border)}
