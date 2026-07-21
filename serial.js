@@ -73,6 +73,7 @@ export class GatewaySerial extends EventTarget {
   }
 
   _onChunk(text) {
+    console.debug('[RAWCHUNK]', JSON.stringify(text));
     this.rxBuf += text;
     let idx;
     while ((idx = this.rxBuf.indexOf('\n')) >= 0) {
