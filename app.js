@@ -150,19 +150,35 @@ gw.addEventListener('result', (e) => {
 
 gw.addEventListener('push', (e) => ui.applyPush(e.detail));
 
-document.getElementById('btn-connect').addEventListener('click', async (e) => {
+function flashPressed(btn) {
   // Feedback immediato al click (anello che si dilata da sotto il punto
   // premuto), a prescindere da quanto ci mette la vera connessione/
-  // disconnessione USB a rispondere - vedi conversazione.
-  const btn = e.currentTarget;
+  // disconnessione USB/BLE a rispondere - vedi conversazione.
   btn.classList.remove('pressed');
   void btn.offsetWidth;
   btn.classList.add('pressed');
   setTimeout(() => btn.classList.remove('pressed'), 500);
+}
 
+document.getElementById('btn-connect').addEventListener('click', async (e) => {
+  flashPressed(e.currentTarget);
   if (gw.connected) { await gw.disconnect(); return; }
   try { await gw.connect(); } catch (err) { ui.log('Errore connessione: ' + err.message, 'err'); }
 });
+
+// Pulsante Bluetooth (addon ESP32-S3 Zero, vedi esp32s3_ble_bridge/): visibile
+// solo se il browser supporta Web Bluetooth (niente su Firefox/Safari, vedi
+// banner-nosupport) - stesso gw, stessa coda comandi/parsing, cambia solo il
+// trasporto sottostante (vedi serial.js: connect() vs connectBle()).
+const btnBle = document.getElementById('btn-connect-ble');
+if ('bluetooth' in navigator) {
+  btnBle.style.display = '';
+  btnBle.addEventListener('click', async (e) => {
+    flashPressed(e.currentTarget);
+    if (gw.connected) { await gw.disconnect(); return; }
+    try { await gw.connectBle(); } catch (err) { ui.log('Errore connessione Bluetooth: ' + err.message, 'err'); }
+  });
+}
 document.getElementById('btn-refresh').addEventListener('click', () => {
   const btn = document.getElementById('btn-refresh');
   btn.classList.remove('spinning');

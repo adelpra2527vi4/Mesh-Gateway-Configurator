@@ -1,13 +1,35 @@
-// Modulo Web Serial: apre la porta USB CDC del gateway, accumula i byte in
-// arrivo in righe complete (i chunk USB non corrispondono 1:1 alle righe),
-// e smista ogni riga negli eventi 'line' / 'state' / 'status' / 'sniffer' /
-// 'push' / 'result'. Nessuna dipendenza esterna - EventTarget nativo del browser.
+// Modulo Web Serial (+ Web Bluetooth): apre il trasporto verso il gateway
+// (porta USB CDC, o addon ESP32-S3 BLE per l'uso da smartphone - vedi
+// esp32s3_ble_bridge/), accumula i byte in arrivo in righe complete (i chunk
+// USB/BLE non corrispondono 1:1 alle righe), e smista ogni riga negli eventi
+// 'line' / 'state' / 'status' / 'sniffer' / 'push' / 'result'. Nessuna
+// dipendenza esterna - EventTarget nativo del browser.
+//
+// mode: 'serial' (Web Serial/USB, connect()) oppure 'ble' (Web Bluetooth via
+// addon ESP32-S3 Zero, connectBle()) - stessa istanza, stessa coda di
+// parsing/eventi: il resto della PWA (app.js/ui.js) non deve sapere quale dei
+// due e' attivo.
 
 const BLOCK_TIMEOUT_MS = 5000;
+
+// Nordic UART Service: UUID standard "de facto" per bridge seriali su BLE
+// GATT (usato dall'addon ESP32-S3, vedi esp32s3_ble_bridge/src/main.cpp).
+// RX = characteristic su cui la PWA scrive (verso il gateway), TX = notify
+// (dal gateway verso la PWA) - nomi dal punto di vista del periferico BLE.
+const NUS_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_RX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+// Le scritture GATT non sono garantite oltre l'MTU negoziato (spesso 23 byte
+// di default, cioe' 20 di payload utile finche' non si negozia un MTU piu'
+// grande): si spezzano le righe piu' lunghe in pacchetti da 20 byte, il
+// gateway/ESP li riassembla comunque perche' guarda solo i newline, non i
+// confini dei pacchetti BLE.
+const BLE_WRITE_CHUNK = 20;
 
 export class GatewaySerial extends EventTarget {
   constructor() {
     super();
+    this.mode = null; // 'serial' | 'ble'
     this.port = null;
     this.reader = null;
     this.connected = false;
@@ -16,6 +38,11 @@ export class GatewaySerial extends EventTarget {
     this._statusAcc = null;  // CFG:STATUS_START..END (relè + sensori BLE classici)
     this._sniffAcc = null;   // CFG:SNIFF_START..END (dispositivi sniffer)
     this._blockTimer = null;
+    // BLE
+    this.bleDevice = null;
+    this.bleServer = null;
+    this.bleRxChar = null; // scrittura (verso gateway)
+    this.bleTxChar = null; // notify (dal gateway)
   }
 
   async connect() {
@@ -24,39 +51,90 @@ export class GatewaySerial extends EventTarget {
     }
     this.port = await navigator.serial.requestPort();
     await this.port.open({ baudRate: 115200 });
+    this.mode = 'serial';
     this.connected = true;
-    // Il protocollo CFG: non ripubblica mai il fattore di calibrazione lux
-    // salvato sul dispositivo (vive solo su questo browser, vedi ui.js:
-    // loadLuxCalib/saveLuxCalib), quindi non c'e' modo di sapere se il
-    // dispositivo appena scelto in requestPort() e' lo stesso di prima o un
-    // altro nRF/ESP fisico diverso. Per non mostrare badge "Calibrato" di un
-    // device diverso su un altro, si azzera qui ad ogni nuova connessione:
-    // l'unico costo e' che il badge sparisce anche riconnettendosi allo
-    // stesso device (nessuna identita' persistente da confrontare), meglio
-    // di un dato sbagliato mostrato con sicurezza.
-    try { localStorage.removeItem('lux_calib'); } catch {}
-    this.dispatchEvent(new CustomEvent('connected'));
+    this._onFreshConnect();
     this._readLoop();
   }
 
+  async connectBle() {
+    if (!('bluetooth' in navigator)) {
+      throw new Error('Web Bluetooth non disponibile in questo browser.');
+    }
+    this.bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [NUS_SERVICE_UUID] }],
+    });
+    this.bleDevice.addEventListener('gattserverdisconnected', () => {
+      if (this.connected && this.mode === 'ble') {
+        this.connected = false;
+        this._clearBlockTimer();
+        this.dispatchEvent(new CustomEvent('disconnected'));
+      }
+    });
+    this.bleServer = await this.bleDevice.gatt.connect();
+    const service = await this.bleServer.getPrimaryService(NUS_SERVICE_UUID);
+    this.bleRxChar = await service.getCharacteristic(NUS_RX_CHAR_UUID);
+    this.bleTxChar = await service.getCharacteristic(NUS_TX_CHAR_UUID);
+    await this.bleTxChar.startNotifications();
+    this.bleTxChar.addEventListener('characteristicvaluechanged', (e) => {
+      const text = new TextDecoder().decode(e.target.value);
+      this._onChunk(text);
+    });
+    this.mode = 'ble';
+    this.connected = true;
+    this._onFreshConnect();
+  }
+
+  _onFreshConnect() {
+    // Il protocollo CFG: non ripubblica mai il fattore di calibrazione lux
+    // salvato sul dispositivo (vive solo su questo browser, vedi ui.js:
+    // loadLuxCalib/saveLuxCalib), quindi non c'e' modo di sapere se il
+    // dispositivo appena scelto e' lo stesso di prima o un altro nRF/ESP
+    // fisico diverso. Per non mostrare badge "Calibrato" di un device diverso
+    // su un altro, si azzera qui ad ogni nuova connessione: l'unico costo e'
+    // che il badge sparisce anche riconnettendosi allo stesso device (nessuna
+    // identita' persistente da confrontare), meglio di un dato sbagliato
+    // mostrato con sicurezza.
+    try { localStorage.removeItem('lux_calib'); } catch {}
+    this.dispatchEvent(new CustomEvent('connected'));
+  }
+
   async disconnect() {
+    const mode = this.mode;
     this.connected = false;
-    try { if (this.reader) await this.reader.cancel(); } catch (_) {}
-    try { if (this.port) await this.port.close(); } catch (_) {}
-    this.reader = null;
-    this.port = null;
+    this.mode = null;
+    if (mode === 'ble') {
+      try { if (this.bleTxChar) await this.bleTxChar.stopNotifications(); } catch (_) {}
+      try { if (this.bleDevice && this.bleDevice.gatt.connected) this.bleDevice.gatt.disconnect(); } catch (_) {}
+      this.bleDevice = null; this.bleServer = null; this.bleRxChar = null; this.bleTxChar = null;
+    } else {
+      try { if (this.reader) await this.reader.cancel(); } catch (_) {}
+      try { if (this.port) await this.port.close(); } catch (_) {}
+      this.reader = null;
+      this.port = null;
+    }
     this._clearBlockTimer();
     this.dispatchEvent(new CustomEvent('disconnected'));
   }
 
   async send(line) {
-    if (!this.connected || !this.port || !this.port.writable) return;
+    if (!this.connected) return;
     const encoder = new TextEncoder();
-    const writer = this.port.writable.getWriter();
-    try {
-      await writer.write(encoder.encode(line + '\n'));
-    } finally {
-      writer.releaseLock();
+    const bytes = encoder.encode(line + '\n');
+    if (this.mode === 'ble') {
+      if (!this.bleRxChar) return;
+      for (let off = 0; off < bytes.length; off += BLE_WRITE_CHUNK) {
+        const chunk = bytes.slice(off, off + BLE_WRITE_CHUNK);
+        await this.bleRxChar.writeValueWithoutResponse(chunk);
+      }
+    } else {
+      if (!this.port || !this.port.writable) return;
+      const writer = this.port.writable.getWriter();
+      try {
+        await writer.write(bytes);
+      } finally {
+        writer.releaseLock();
+      }
     }
     this.dispatchEvent(new CustomEvent('tx', { detail: line }));
   }
