@@ -14,39 +14,51 @@
   Questo configuratore richiede Chrome o Edge. Firefox e Safari non supportano Web Serial ne' Web Bluetooth.
 </div>
 
-<!-- DOPO (index.html) -->
 <div class="topbar">
   <div class="brand"><span class="dot" id="conn-dot"></span><h1>Terminal Controller</h1></div>
   <span id="badge-busy" class="badge warn" style="display:none">Config...</span>
   <span id="badge-oob" class="badge good" style="display:none">OOB &#9989;</span>
-  <button id="btn-refresh" class="iconbtn" title="Aggiorna">...</button>
-  <button id="btn-theme" class="iconbtn theme-toggle" title="Cambia tema">...</button>
-  
-  <!-- Contenitore relativo per ancorare il menu fluttuante -->
+  <button id="btn-refresh" class="iconbtn" title="Aggiorna"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg></button>
+  <button id="btn-theme" class="iconbtn theme-toggle" title="Cambia tema" aria-label="Cambia tema">
+    <svg class="theme-icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+      <circle cx="16.6" cy="6.2" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+    <svg class="theme-icon moon" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
+    </svg>
+  </button>
   <div class="connect-wrap">
-    <button id="btn-connect" class="btn primary" aria-haspopup="true" aria-expanded="false" title="Seleziona metodo di connessione">
+    <button id="btn-connect" class="btn primary">
       <span class="btn-connect-label">Connetti</span>
     </button>
-    
-    <!-- Menu a comparsa fluttuante -->
-    <div id="connect-menu" class="connect-menu hidden" role="menu" aria-label="Metodi di connessione">
-      <button type="button" class="connect-menu-item" data-transport="usb" role="menuitem">
-        <!-- Icona USB -->
+    <div id="connect-menu" class="connect-menu hidden">
+      <button type="button" class="connect-menu-item" data-transport="usb">
+        <!-- SVG Tridente USB Ufficiale Orizzontale -->
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="10" cy="7" r="1"/><circle cx="4" cy="20" r="1"/><path d="M4.7 19.3 19 5"/><polygon points="21 3 18 4 20 6 21 3"/><path d="M9.26 7.68 5 12l2 5"/><path d="m10 14 5 2 3.5-3.5"/><rect x="14" y="17" width="3" height="3" rx="0.5"/>
+          <!-- Cerchio base a sinistra -->
+          <circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+          <!-- Asta principale orizzontale -->
+          <line x1="5" y1="12" x2="17" y2="12"/>
+          <!-- Freccia centrale a destra -->
+          <polygon points="17,8.5 22,12 17,15.5" fill="currentColor" stroke="none"/>
+          <!-- Ramo superiore con Quadrato -->
+          <path d="M 8 12 L 12 7 H 15"/>
+          <rect x="15" y="5.5" width="3" height="3" fill="currentColor" stroke="none"/>
+          <!-- Ramo inferiore con Cerchio -->
+          <path d="M 10 12 L 13 17 H 15"/>
+          <circle cx="16.5" cy="17" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
         <span>USB (Web Serial)</span>
       </button>
-      
-      <button type="button" class="connect-menu-item" id="connect-menu-ble" data-transport="ble" role="menuitem">
-        <!-- Icona Bluetooth -->
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M7 7l10 10-5 5V2l5 5L7 17"/>
-        </svg>
-        <span>Bluetooth (Web BLE)</span>
+      <button type="button" class="connect-menu-item" id="connect-menu-ble" data-transport="ble">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg>
+        <span>Bluetooth</span>
       </button>
     </div>
   </div>
+</div>
 </div>
 
 <div id="main-content" style="display:none">
