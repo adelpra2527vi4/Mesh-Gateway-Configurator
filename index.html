@@ -32,9 +32,22 @@
     <svg class="theme-icon moon" viewBox="0 0 24 24" fill="currentColor">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
     </svg>
-  </button>
-  <button id="btn-connect" class="btn primary"><span class="btn-connect-label">Connetti</span></button>
-  <button id="btn-connect-ble" class="btn primary" style="display:none"><span class="btn-connect-label">Bluetooth</span></button>
+    </button>
+    <div class="connect-wrap">
+    <button id="btn-connect" class="btn primary">
+      <span class="btn-connect-label">Connetti</span>
+    </button>
+    <div id="connect-menu" class="connect-menu hidden">
+      <button type="button" class="connect-menu-item" data-transport="usb">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v10H4z"/></svg>
+        USB (Web Serial)
+      </button>
+      <button type="button" class="connect-menu-item" id="connect-menu-ble" data-transport="ble">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg>
+        Bluetooth
+      </button>
+    </div>
+  </div>
 </div>
 
 <div id="main-content" style="display:none">

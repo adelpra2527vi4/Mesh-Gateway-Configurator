@@ -160,25 +160,45 @@ function flashPressed(btn) {
   setTimeout(() => btn.classList.remove('pressed'), 500);
 }
 
-document.getElementById('btn-connect').addEventListener('click', async (e) => {
+const btnConnect = document.getElementById('btn-connect');
+const connectMenu = document.getElementById('connect-menu');
+const bleMenuItem = document.getElementById('connect-menu-ble');
+
+if (!('bluetooth' in navigator)) {
+  bleMenuItem.disabled = true;
+  bleMenuItem.title = 'Web Bluetooth non disponibile in questo browser';
+}
+
+function closeConnectMenu() {
+  connectMenu.classList.add('hidden');
+  document.removeEventListener('click', onDocClick);
+}
+function onDocClick(e) {
+  if (!connectMenu.contains(e.target) && e.target !== btnConnect) closeConnectMenu();
+}
+
+btnConnect.addEventListener('click', async (e) => {
   flashPressed(e.currentTarget);
   if (gw.connected) { await gw.disconnect(); return; }
-  try { await gw.connect(); } catch (err) { ui.log('Errore connessione: ' + err.message, 'err'); }
+  const isOpen = !connectMenu.classList.contains('hidden');
+  if (isOpen) { closeConnectMenu(); return; }
+  connectMenu.classList.remove('hidden');
+  setTimeout(() => document.addEventListener('click', onDocClick), 0);
 });
 
-// Pulsante Bluetooth (addon ESP32-S3 Zero, vedi esp32s3_ble_bridge/): visibile
-// solo se il browser supporta Web Bluetooth (niente su Firefox/Safari, vedi
-// banner-nosupport) - stesso gw, stessa coda comandi/parsing, cambia solo il
-// trasporto sottostante (vedi serial.js: connect() vs connectBle()).
-const btnBle = document.getElementById('btn-connect-ble');
-if ('bluetooth' in navigator) {
-  btnBle.style.display = '';
-  btnBle.addEventListener('click', async (e) => {
-    flashPressed(e.currentTarget);
-    if (gw.connected) { await gw.disconnect(); return; }
-    try { await gw.connectBle(); } catch (err) { ui.log('Errore connessione Bluetooth: ' + err.message, 'err'); }
+connectMenu.querySelectorAll('.connect-menu-item').forEach(item => {
+  item.addEventListener('click', async () => {
+    closeConnectMenu();
+    const transport = item.dataset.transport;
+    try {
+      if (transport === 'usb') await gw.connect();
+      else await gw.connectBle();
+    } catch (err) {
+      ui.log(`Errore connessione ${transport === 'ble' ? 'Bluetooth' : 'USB'}: ${err.message}`, 'err');
+    }
   });
-}
+});
+
 document.getElementById('btn-refresh').addEventListener('click', () => {
   const btn = document.getElementById('btn-refresh');
   btn.classList.remove('spinning');
