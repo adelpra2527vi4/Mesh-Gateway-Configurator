@@ -25,6 +25,16 @@ export class GatewaySerial extends EventTarget {
     this.port = await navigator.serial.requestPort();
     await this.port.open({ baudRate: 115200 });
     this.connected = true;
+    // Il protocollo CFG: non ripubblica mai il fattore di calibrazione lux
+    // salvato sul dispositivo (vive solo su questo browser, vedi ui.js:
+    // loadLuxCalib/saveLuxCalib), quindi non c'e' modo di sapere se il
+    // dispositivo appena scelto in requestPort() e' lo stesso di prima o un
+    // altro nRF/ESP fisico diverso. Per non mostrare badge "Calibrato" di un
+    // device diverso su un altro, si azzera qui ad ogni nuova connessione:
+    // l'unico costo e' che il badge sparisce anche riconnettendosi allo
+    // stesso device (nessuna identita' persistente da confrontare), meglio
+    // di un dato sbagliato mostrato con sicurezza.
+    try { localStorage.removeItem('lux_calib'); } catch {}
     this.dispatchEvent(new CustomEvent('connected'));
     this._readLoop();
   }
