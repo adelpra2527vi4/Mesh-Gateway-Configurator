@@ -160,43 +160,102 @@ function flashPressed(btn) {
   setTimeout(() => btn.classList.remove('pressed'), 500);
 }
 
+// ============================================================
+// GESTIONE PULSANTE E MENU DI CONNESIONE (USB / BLE)
+// ============================================================
 const btnConnect = document.getElementById('btn-connect');
 const connectMenu = document.getElementById('connect-menu');
 const bleMenuItem = document.getElementById('connect-menu-ble');
 
-if (!('bluetooth' in navigator)) {
+// Controlla se il browser supporta Web Bluetooth
+if (bleMenuItem && !('bluetooth' in navigator)) {
   bleMenuItem.disabled = true;
   bleMenuItem.title = 'Web Bluetooth non disponibile in questo browser';
 }
 
+/**
+ * Chiude il menu fluttuante di connessione e aggiorna gli attributi ARIA.
+ */
 function closeConnectMenu() {
-  connectMenu.classList.add('hidden');
-  document.removeEventListener('click', onDocClick);
-}
-function onDocClick(e) {
-  if (!connectMenu.contains(e.target) && e.target !== btnConnect) closeConnectMenu();
+  if (connectMenu && !connectMenu.classList.contains('hidden')) {
+    connectMenu.classList.add('hidden');
+    btnConnect.setAttribute('aria-expanded', 'false');
+  }
 }
 
+/**
+ * Apre il menu fluttuante di connessione e aggiorna gli attributi ARIA.
+ */
+function openConnectMenu() {
+  if (connectMenu && connectMenu.classList.contains('hidden')) {
+    connectMenu.classList.remove('hidden');
+    btnConnect.setAttribute('aria-expanded', 'true');
+  }
+}
+
+// 1. Gestione click sul pulsante principale "Connetti / Disconnetti"
 btnConnect.addEventListener('click', async (e) => {
-  flashPressed(e.currentTarget);
-  if (gw.connected) { await gw.disconnect(); return; }
-  const isOpen = !connectMenu.classList.contains('hidden');
-  if (isOpen) { closeConnectMenu(); return; }
-  connectMenu.classList.remove('hidden');
-  setTimeout(() => document.addEventListener('click', onDocClick), 0);
+  e.stopPropagation();
+  flashPressed(e.currentTarget); // Animazione di pressione al click
+
+  // Se la scheda è già connessa (USB o Bluetooth), disconnetti subito
+  if (gw.connected) {
+    closeConnectMenu();
+    try {
+      await gw.disconnect();
+    } catch (err) {
+      ui.log('Errore durante la disconnessione: ' + err.message, 'err');
+    }
+    return;
+  }
+
+  // Se disconnesso, alterna la visibilità del menu fluttuante
+  const isHidden = connectMenu.classList.contains('hidden');
+  if (isHidden) {
+    openConnectMenu();
+  } else {
+    closeConnectMenu();
+  }
 });
 
-connectMenu.querySelectorAll('.connect-menu-item').forEach(item => {
-  item.addEventListener('click', async () => {
-    closeConnectMenu();
-    const transport = item.dataset.transport;
-    try {
-      if (transport === 'usb') await gw.connect();
-      else await gw.connectBle();
-    } catch (err) {
-      ui.log(`Errore connessione ${transport === 'ble' ? 'Bluetooth' : 'USB'}: ${err.message}`, 'err');
-    }
+// 2. Gestione click sulle opzioni all'interno del menu (USB / Bluetooth)
+if (connectMenu) {
+  connectMenu.querySelectorAll('.connect-menu-item').forEach((item) => {
+    item.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const transport = item.dataset.transport;
+      
+      // Chiude il menu subito dopo la selezione
+      closeConnectMenu();
+
+      try {
+        if (transport === 'usb') {
+          await gw.connect();
+        } else if (transport === 'ble') {
+          await gw.connectBle();
+        }
+      } catch (err) {
+        // Ignora l'errore se l'utente chiude la finestra di selezione del browser
+        if (err.name !== 'NotFoundError' && err.name !== 'AbortError') {
+          ui.log(`Errore di connessione (${transport.toUpperCase()}): ${err.message}`, 'err');
+        }
+      }
+    });
   });
+}
+
+// 3. Chiusura del menu quando si clicca all'esterno della topbar
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.connect-wrap')) {
+    closeConnectMenu();
+  }
+});
+
+// 4. Chiusura del menu premendo il tasto ESC (Accessibilità)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeConnectMenu();
+  }
 });
 
 document.getElementById('btn-refresh').addEventListener('click', () => {

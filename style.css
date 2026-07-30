@@ -432,40 +432,86 @@ details[open] summary::before{content:'\25BE '}
 .mqtt-dot.good{background:var(--green)}
 .mqtt-state-label{font-weight:700;font-size:.88rem;flex:none}
 .mqtt-last{font-family:ui-monospace,monospace;font-size:.82rem;color:var(--muted);word-break:break-all}
-.connect-wrap { position: relative; display: inline-block; }
-
-.connect-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 200px;
-  background: var(--card-bg, #1e1e1e);
-  border: 1px solid var(--border-color, rgba(255,255,255,.12));
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.35);
-  padding: 6px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* DOPO (style.css) */
+.connect-wrap {
+  position: relative;
+  display: inline-block;
 }
 
-.connect-menu.hidden { display: none; }
+/* Menu fluttuante con posizionamento assoluto e animazione smooth */
+.connect-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  
+  /* Stato visibile attivo con transizioni */
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: top right;
+  transition: opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0.18s;
+  visibility: visible;
+}
 
+/* Stato nascosto con effetto dissolvenza e contrazione */
+.connect-menu.hidden {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Voci interne al menu */
 .connect-menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  width: 100%;
   background: transparent;
-  border: none;
-  color: inherit;
-  padding: 8px 10px;
-  border-radius: 7px;
-  font-size: .9em;
+  border: 1px solid transparent;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.connect-menu-item:hover { background: rgba(127,127,127,.15); }
+.connect-menu-item svg {
+  flex: none;
+  color: var(--accent);
+  transition: transform 0.15s ease;
+}
 
-.connect-menu-item[disabled] { opacity: .4; cursor: not-allowed; pointer-events: none; }
+/* Effetto hover e focus per una migliore UX */
+.connect-menu-item:hover,
+.connect-menu-item:focus-visible {
+  background: var(--surface2);
+  border-color: var(--border2);
+  color: var(--accent);
+  outline: none;
+}
+
+.connect-menu-item:hover svg {
+  transform: scale(1.12);
+}
+
+.connect-menu-item[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

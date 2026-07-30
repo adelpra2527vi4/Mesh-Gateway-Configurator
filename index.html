@@ -14,37 +14,41 @@
   Questo configuratore richiede Chrome o Edge. Firefox e Safari non supportano Web Serial ne' Web Bluetooth.
 </div>
 
+<!-- DOPO (index.html) -->
 <div class="topbar">
   <div class="brand"><span class="dot" id="conn-dot"></span><h1>Terminal Controller</h1></div>
   <span id="badge-busy" class="badge warn" style="display:none">Config...</span>
   <span id="badge-oob" class="badge good" style="display:none">OOB &#9989;</span>
-  <button id="btn-refresh" class="iconbtn" title="Aggiorna"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg></button>
-  <button id="btn-theme" class="iconbtn theme-toggle" title="Cambia tema" aria-label="Cambia tema">
-    <svg class="theme-icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="4"/>
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
-      <!-- Puntino fuori asse (non allineato agli 8 raggi, ogni 45°): senza
-           questo la rotazione e' invisibile, un sole a raggi simmetrici
-           torna identico a se stesso 8 volte per giro - vedi conversazione
-           ("il sole non ruota piu'"). -->
-      <circle cx="16.6" cy="6.2" r="1" fill="currentColor" stroke="none"/>
-    </svg>
-    <svg class="theme-icon moon" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
-    </svg>
-    </button>
-    <div class="connect-wrap">
-    <button id="btn-connect" class="btn primary">
+  <button id="btn-refresh" class="iconbtn" title="Aggiorna">...</button>
+  <button id="btn-theme" class="iconbtn theme-toggle" title="Cambia tema">...</button>
+  
+  <!-- Contenitore relativo per ancorare il menu fluttuante -->
+  <div class="connect-wrap">
+    <button id="btn-connect" class="btn primary" aria-haspopup="true" aria-expanded="false" title="Seleziona metodo di connessione">
       <span class="btn-connect-label">Connetti</span>
     </button>
-    <div id="connect-menu" class="connect-menu hidden">
-      <button type="button" class="connect-menu-item" data-transport="usb">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v10H4z"/></svg>
-        USB (Web Serial)
+    
+    <!-- Menu a comparsa fluttuante -->
+    <div id="connect-menu" class="connect-menu hidden" role="menu" aria-label="Metodi di connessione">
+      <button type="button" class="connect-menu-item" data-transport="usb" role="menuitem">
+        <!-- Icona USB -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="6" r="1.5"/>
+          <path d="M12 7.5V19"/>
+          <path d="M12 12H8.5c-.83 0-1.5-.67-1.5-1.5V9.5"/>
+          <path d="M12 15h3.5c.83 0 1.5.67 1.5 1.5v1"/>
+          <path d="M5.5 9.5L7 8l1.5 1.5"/>
+          <path d="M15.5 19H18.5V16"/>
+        </svg>
+        <span>USB (Web Serial)</span>
       </button>
-      <button type="button" class="connect-menu-item" id="connect-menu-ble" data-transport="ble">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg>
-        Bluetooth
+      
+      <button type="button" class="connect-menu-item" id="connect-menu-ble" data-transport="ble" role="menuitem">
+        <!-- Icona Bluetooth -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 7l10 10-5 5V2l5 5L7 17"/>
+        </svg>
+        <span>Bluetooth (Web BLE)</span>
       </button>
     </div>
   </div>
