@@ -73,7 +73,7 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .iconbtn.spinning{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
 .iconbtn.spinning svg{animation:refresh-spin 1.4s cubic-bezier(.65,.05,.36,1)}
 .iconbtn.spinning::after{content:'';position:absolute;inset:-2px;border-radius:11px;border:2px solid var(--accent);opacity:.55;animation:refresh-burst 1.4s ease-out forwards}
-@keyframes refresh-spin{to{transform:rotate(-360deg)}}
+@keyframes refresh-spin{from{transform:scaleX(-1) rotate(0deg)}to{transform:scaleX(-1) rotate(360deg)}}
 @keyframes refresh-burst{0%{transform:scale(.85);opacity:.5}100%{transform:scale(1.35);opacity:0}}
 
 /* Pulsante notte/giorno: mostra l'icona di CIO' SU CUI SI STA PER CLICCARE
