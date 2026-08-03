@@ -37,13 +37,17 @@
     </button>
     <div id="connect-menu" class="connect-menu hidden">
       <button type="button" class="connect-menu-item" data-transport="usb">
-        <!-- Icona USB minimale: solo rettangoli semplici (corpo + 2 piedini),
-             niente path complessi ricordati a memoria - troppo rischiosi
-             senza poterli vedere dal vivo (vedi conversazione). -->
+        <!-- Simbolo USB "tridente": cerchio a sinistra - asta - freccia a
+             destra, con due rami curvi (cerchio in alto, quadrato in basso) -
+             ricostruito da un riferimento visivo mandato dall'utente. -->
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="10" y="4" width="1.8" height="6"/>
-          <rect x="13" y="4" width="1.8" height="6"/>
-          <rect x="8" y="9" width="8" height="11" rx="2"/>
+          <circle cx="4" cy="12" r="3.2"/>
+          <path d="M6.5 12H18" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+          <path d="M10 12C10 8 11 6.3 14 6.3" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+          <path d="M10 12C10 16 11 17.7 14 17.7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+          <circle cx="15.5" cy="6" r="2.4"/>
+          <rect x="14.3" y="15.7" width="4.4" height="4.4" rx="1"/>
+          <polygon points="17,7.5 23,12 17,16.5"/>
         </svg>
         <span>USB (Web Serial)</span>
       </button>
