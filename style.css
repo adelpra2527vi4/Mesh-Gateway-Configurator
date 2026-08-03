@@ -1,7 +1,7 @@
 /* Stessa palette/stile della vecchia pagina web del gateway (root_get_handler
    + setup_get_handler in main.c) - vedi main_grafica.c di riferimento. */
-:root{--bg:#10151b;--surface:#19212b;--surface2:#212c38;--border:#2c3a48;--border2:#3a4b5c;--accent:#2fb6a3;--accent-fg:#06140f;--green:#3fcf8e;--red:#ff6b6b;--yellow:#f2b34a;--orange:#ff9f43;--text:#e7eef5;--muted:#90a0b0;--radius:14px;--shadow:0 1px 2px rgba(0,0,0,.4)}
-:root.light{--bg:#eef2f6;--surface:#fff;--surface2:#f4f7fa;--border:#dde4ea;--border2:#c6d0da;--accent:#0d8d7e;--accent-fg:#fff;--green:#1f9d57;--red:#d83a3a;--yellow:#b07a12;--orange:#c9660c;--text:#16202b;--muted:#5d6b78;--shadow:0 1px 2px rgba(16,32,48,.06)}
+:root{--bg:#10151b;--surface:#19212b;--surface2:#212c38;--border:#2c3a48;--border2:#3a4b5c;--accent:#002e6d;--accent-fg:#fff;--green:#3fcf8e;--red:#ff6b6b;--yellow:#f2b34a;--orange:#ff9f43;--text:#e7eef5;--muted:#90a0b0;--radius:14px;--shadow:0 1px 2px rgba(0,0,0,.4)}
+:root.light{--bg:#f4f5f8;--surface:#ffffff;--surface2:#eef0f4;--border:#e2e5ec;--border2:#cdd2dc;--accent:#002e6d;--accent-fg:#fff;--green:#1f9d57;--red:#d83a3a;--yellow:#b07a12;--orange:#c9660c;--text:#1c2230;--muted:#6b7280;--shadow:0 1px 2px rgba(16,32,48,.06)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 /* 880px -> ~1600px (limitato al 96% del viewport, non fisso): la connessione
@@ -9,7 +9,7 @@ html{-webkit-text-size-adjust:100%}
    PC/laptop - niente piu' bisogno di tenerla stretta per il mobile. 1180px
    lasciava ancora enormi barre grigie vuote ai lati su un monitor widescreen
    - vedi conversazione ("dovevi recuperare lo spazio delle barre laterali"). */
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:none;margin:0;padding:0 28px 56px;color:var(--text);background:var(--bg);line-height:1.45}
+body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;max-width:none;margin:0;padding:0 28px 56px;color:var(--text);background:var(--bg);line-height:1.45}
 a{color:var(--accent)}
 h2,h3,h4{color:var(--text);letter-spacing:-.01em}
 h3{font-size:1.05em;margin:22px 0 10px}h4{font-size:.95em;margin:16px 0 6px}
