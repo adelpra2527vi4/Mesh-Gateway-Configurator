@@ -263,7 +263,7 @@ document.getElementById('btn-refresh').addEventListener('click', () => {
   btn.classList.remove('spinning');
   void btn.offsetWidth; // forza reflow: riavvia l'animazione anche se già attiva
   btn.classList.add('spinning');
-  setTimeout(() => btn.classList.remove('spinning'), 1400);
+  setTimeout(() => btn.classList.remove('spinning'), 600);
   requestState(); requestStatus();
 });
 document.querySelectorAll('.btn-clearlog').forEach(btn => btn.addEventListener('click', () => ui.clearLog()));

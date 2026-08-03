@@ -65,16 +65,13 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .iconbtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--muted);cursor:pointer;font-size:1rem;transition:color .35s,border-color .35s}
 .iconbtn:hover{color:var(--text);border-color:var(--border2)}
 
-/* Pulsante "Aggiorna": rotazione unica, morbida e continua (niente
-   overshoot/scale a scatti - la prima versione era troppo "nervosa", vedi
-   conversazione), con un anello che si dilata piano e sfuma dal bordo del
-   pulsante + il colore che vira verso l'accento durante il giro e torna a
-   sbiadire dopo. */
+/* Pulsante "Aggiorna": l'icona e' il classico "refresh-cw" (due frecce
+   disegnate per una rotazione oraria, stroke non fill) - ruotarla in senso
+   orario e' quindi sempre coerente col disegno, senza bisogno di specchiare
+   nulla via CSS/transform (fonte di bug in precedenza). */
 .iconbtn.spinning{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
-.iconbtn.spinning svg{animation:refresh-spin 1.4s cubic-bezier(.65,.05,.36,1)}
-.iconbtn.spinning::after{content:'';position:absolute;inset:-2px;border-radius:11px;border:2px solid var(--accent);opacity:.55;animation:refresh-burst 1.4s ease-out forwards}
-@keyframes refresh-spin{to{transform:rotate(-360deg)}}
-@keyframes refresh-burst{0%{transform:scale(.85);opacity:.5}100%{transform:scale(1.35);opacity:0}}
+.iconbtn.spinning svg{animation:refresh-spin .6s linear}
+@keyframes refresh-spin{to{transform:rotate(360deg)}}
 
 /* Pulsante notte/giorno: mostra l'icona di CIO' SU CUI SI STA PER CLICCARE
    (di notte mostra il sole = "passa al giorno", di giorno mostra la luna =
