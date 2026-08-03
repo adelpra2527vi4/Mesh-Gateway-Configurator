@@ -37,20 +37,18 @@
     </button>
     <div id="connect-menu" class="connect-menu hidden">
       <button type="button" class="connect-menu-item" data-transport="usb">
-        <!-- SVG Tridente USB Ufficiale Orizzontale -->
+        <!-- Tridente USB: freccia in ingresso, giunzione centrale, 3 rami
+             (cerchio in alto, quadrato dritto, triangolo in basso) - stesso
+             stile stroke della Bluetooth qui sotto. -->
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <!-- Cerchio base a sinistra -->
-          <circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
-          <!-- Asta principale orizzontale -->
-          <line x1="5" y1="12" x2="17" y2="12"/>
-          <!-- Freccia centrale a destra -->
-          <polygon points="17,8.5 22,12 17,15.5" fill="currentColor" stroke="none"/>
-          <!-- Ramo superiore con Quadrato -->
-          <path d="M 8 12 L 12 7 H 15"/>
-          <rect x="15" y="5.5" width="3" height="3" fill="currentColor" stroke="none"/>
-          <!-- Ramo inferiore con Cerchio -->
-          <path d="M 10 12 L 13 17 H 15"/>
-          <circle cx="16.5" cy="17" r="1.5" fill="currentColor" stroke="none"/>
+          <polygon points="2,9.3 2,14.7 5.5,12" fill="currentColor" stroke="none"/>
+          <path d="M5.5 12H11"/>
+          <path d="M11 12L16 7"/>
+          <circle cx="17.3" cy="5.7" r="1.6" fill="currentColor" stroke="none"/>
+          <path d="M11 12H17"/>
+          <rect x="17.5" y="10.5" width="3" height="3" fill="currentColor" stroke="none"/>
+          <path d="M11 12L16 17"/>
+          <polygon points="16.3,15.3 20,17.5 16.3,19.7" fill="currentColor" stroke="none"/>
         </svg>
         <span>USB (Web Serial)</span>
       </button>
