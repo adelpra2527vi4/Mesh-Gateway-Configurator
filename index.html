@@ -37,11 +37,13 @@
     </button>
     <div id="connect-menu" class="connect-menu hidden">
       <button type="button" class="connect-menu-item" data-transport="usb">
-        <!-- Icona USB classica a chiavetta/connettore (Material "usb"), fill
-             pieno invece di ricostruire il tridente a mano - troppo rischioso
-             senza poterlo vedere dal vivo (vedi conversazione). -->
+        <!-- Icona USB minimale: solo rettangoli semplici (corpo + 2 piedini),
+             niente path complessi ricordati a memoria - troppo rischiosi
+             senza poterli vedere dal vivo (vedi conversazione). -->
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15 7h1V2h-4v2h-2V2H6v5h1v10c0 1.1.9 2 2 2h1v3h4v-3h1c1.1 0 2-.9 2-2V7z"/>
+          <rect x="10" y="4" width="1.8" height="6"/>
+          <rect x="13" y="4" width="1.8" height="6"/>
+          <rect x="8" y="9" width="8" height="11" rx="2"/>
         </svg>
         <span>USB (Web Serial)</span>
       </button>
