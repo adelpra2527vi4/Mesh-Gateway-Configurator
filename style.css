@@ -2,6 +2,11 @@
    + setup_get_handler in main.c) - vedi main_grafica.c di riferimento. */
 :root{--bg:#10151b;--surface:#19212b;--surface2:#212c38;--border:#2c3a48;--border2:#3a4b5c;--accent:#002e6d;--accent-fg:#fff;--green:#3fcf8e;--red:#ff6b6b;--yellow:#f2b34a;--orange:#ff9f43;--text:#e7eef5;--muted:#90a0b0;--radius:14px;--shadow:0 1px 2px rgba(0,0,0,.4)}
 :root.light{--bg:#f4f5f8;--surface:#ffffff;--surface2:#eef0f4;--border:#e2e5ec;--border2:#cdd2dc;--accent:#002e6d;--accent-fg:#fff;--green:#1f9d57;--red:#d83a3a;--yellow:#b07a12;--orange:#c9660c;--text:#1c2230;--muted:#6b7280;--shadow:0 1px 2px rgba(16,32,48,.06)}
+/* Scala blu GDS (#002e6d), stessa identica progressione del design system
+   di riferimento: --accent qui sopra coincide col loro blue-500. Serve per
+   sfumature coerenti (hover/focus/badge) invece di filter:brightness()
+   ad-hoc sparsi nel file - vedi conversazione ("uniforma lo stile grafico"). */
+:root{--blue-50:#eef1f8;--blue-100:#d5dcee;--blue-200:#a8b8de;--blue-300:#6d8fc8;--blue-400:#3a66b2;--blue-500:#002e6d;--blue-600:#00256b;--blue-700:#001c50;--blue-800:#001438;--blue-900:#000c24;--blue-950:#00061a}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 /* 880px -> ~1600px (limitato al 96% del viewport, non fisso): la connessione
@@ -9,7 +14,7 @@ html{-webkit-text-size-adjust:100%}
    PC/laptop - niente piu' bisogno di tenerla stretta per il mobile. 1180px
    lasciava ancora enormi barre grigie vuote ai lati su un monitor widescreen
    - vedi conversazione ("dovevi recuperare lo spazio delle barre laterali"). */
-body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;max-width:none;margin:0;padding:0 28px 56px;color:var(--text);background:var(--bg);line-height:1.45}
+body{font-family:'Open Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;max-width:none;margin:0;padding:0 28px 56px;color:var(--text);background:var(--bg);line-height:1.45}
 a{color:var(--accent)}
 h2,h3,h4{color:var(--text);letter-spacing:-.01em}
 h3{font-size:1.05em;margin:22px 0 10px}h4{font-size:.95em;margin:16px 0 6px}
@@ -133,6 +138,18 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .tabbtn:hover{border-color:var(--accent);color:var(--accent)}
 .tabbtn.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .tabpanel.hidden{display:none}
+
+/* ── Transizioni GDS: comparsa leggera di viste/pannelli/pill che appaiono
+   una tantum (fadeInUp/popIn) e "scatto" su un valore numerico live che
+   cambia (value-bump) - stessi timing/curve del design system di
+   riferimento, portati qui per uniformare il vocabolario di animazione -
+   vedi conversazione ("uniforma lo stile grafico"). */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.animate-fade-in-up{animation:fadeInUp .25s ease}
+@keyframes popIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.animate-pop-in{animation:popIn .18s cubic-bezier(.16,.84,.36,1)}
+@keyframes valueBump{0%{transform:scale(1)}35%{transform:scale(1.12)}100%{transform:scale(1)}}
+.animate-value-bump{display:inline-block;animation:valueBump .35s ease-out}
 
 .stats{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
 .stat{flex:1 1 180px;max-width:260px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px 14px;box-shadow:var(--shadow)}

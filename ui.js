@@ -372,6 +372,8 @@ export function setConnected(connected) {
     lastStatus = { relays: [], blesensors: [] };
     snifferOn = false;
     provisioningDevice = null;
+    lastStatsShown = { lamps: null, sens: null };
+    lastNodeVals = {};
   }
 }
 
@@ -409,6 +411,7 @@ function startResetCountdown() {
   let n = 5;
   const box = document.getElementById('reset-countdown');
   box.style.display = 'block';
+  box.classList.add('animate-fade-in-up');
   box.textContent = `Riavvio in corso... riconnettiti tra ${n} secondi`;
   const t = setInterval(() => {
     n--;
@@ -454,9 +457,13 @@ function renderUsbModeBanner(usbMode) {
   if (banner) {
     if (!usbMode) {
       banner.textContent = 'Modalità MQTT attiva: tieni premuto BOOT sul gateway per passare a USB e sbloccare scan/provisioning/relè.';
+      // fade-in-up solo alla vera comparsa (era gia' nascosto), non ad ogni
+      // poll mentre resta visibile - altrimenti l'animazione "tremolerebbe".
+      if (banner.style.display !== 'block') banner.classList.add('animate-fade-in-up');
       banner.style.display = 'block'; // #banner ha gia' il suo stile (rosso/border) in style.css
     } else {
       banner.style.display = 'none';
+      banner.classList.remove('animate-fade-in-up');
     }
   }
   for (const id of WRITE_BTN_IDS) {
@@ -498,11 +505,29 @@ export function applyPush(detail) {
   }
 }
 
+// Ultimi valori mostrati nei contatori in alto, per far scattare l'animazione
+// "value-bump" (style.css) solo quando il numero cambia davvero - renderMesh
+// gira ad ogni poll (ogni pochi secondi) quindi senza questo confronto
+// l'animazione ripartirebbe di continuo anche a valori invariati.
+let lastStatsShown = { lamps: null, sens: null };
+// Stessa idea per-nodo (lettura lux dei sensori BLE mesh): { [nd.i]: { lux } }
+let lastNodeVals = {};
+
+function bumpIfChanged(el, newVal, key) {
+  el.textContent = newVal;
+  if (lastStatsShown[key] !== null && lastStatsShown[key] !== newVal) {
+    el.classList.remove('animate-value-bump');
+    void el.offsetWidth; // riavvia l'animazione anche se già in corso
+    el.classList.add('animate-value-bump');
+  }
+  lastStatsShown[key] = newVal;
+}
+
 function renderMesh() {
   const nl = lastState.nodes.filter(n => !n.sw && n.kind === 0).length;
   const ns = lastState.nodes.filter(n => !n.sw && n.kind === 1).length;
-  document.getElementById('st-lamps').textContent = nl;
-  document.getElementById('st-sens').textContent = ns;
+  bumpIfChanged(document.getElementById('st-lamps'), nl, 'lamps');
+  bumpIfChanged(document.getElementById('st-sens'), ns, 'sens');
   document.getElementById('st-busy').textContent = lastState.busy ? 'Config...' : 'Pronto';
   document.getElementById('st-busy-box').classList.toggle('busy', !!lastState.busy);
   document.getElementById('badge-busy').style.display = lastState.busy ? '' : 'none';
@@ -694,6 +719,13 @@ function renderNode(nd) {
     const curLux = luxRawLive[nd.i] !== undefined ? luxRawLive[nd.i]
                    : (s && s.light >= 0 ? s.light / 100 : null);
     const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
+    // "Scatto" (value-bump, style.css) sulla lettura lux solo quando il
+    // valore mostrato cambia davvero rispetto all'ultimo giro - il nodo
+    // viene comunque riscritto per intero ad ogni poll, quindi la classe va
+    // decisa qui in fase di template invece che via classList più sotto.
+    const lastLux = lastNodeVals[nd.i]?.lux;
+    const luxBump = lastLux !== undefined && lastLux !== luxStr ? ' animate-value-bump' : '';
+    lastNodeVals[nd.i] = Object.assign(lastNodeVals[nd.i] || {}, { lux: luxStr });
     const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
 
     // Il firmware applica un fattore moltiplicativo per nodo (sensor_light_cal
@@ -726,7 +758,7 @@ function renderNode(nd) {
 
     return head + `<div class="cards">
         <div class="card"><div class="elem-title">Presenza <span class="pill ${presOn?'on':'off'}">${pres}</span></div></div>
-        <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl" style="margin-top:6px">${luxStr}</div></div>
+        <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>
       </div>${warn}${calibCard}</div>`;
   }
 
@@ -746,7 +778,15 @@ function renderNode(nd) {
       </div></div>`;
   }
   for (const lv of nd.lvls) {
-    cards += `<div class="card"><div class="elem-title">Luminosit&agrave; #${lv.e}<span class="pctlbl" data-li-label="${nd.i}-${lv.li}">${lv.pct}%</span></div>
+    // Bump solo su un cambio "esterno" (push/poll dal firmware): mentre
+    // l'utente trascina lo slider, renderNodes() salta il rerender per
+    // intero (protezione anti-refresh sopra), quindi questo ramo non viene
+    // mai raggiunto durante il drag - niente conflitto con quell'animazione.
+    const lvKey = `${nd.i}-${lv.li}`;
+    const lastLv = lastNodeVals[lvKey]?.pct;
+    const lvBump = lastLv !== undefined && lastLv !== lv.pct ? ' animate-value-bump' : '';
+    lastNodeVals[lvKey] = { pct: lv.pct };
+    cards += `<div class="card"><div class="elem-title">Luminosit&agrave; #${lv.e}<span class="pctlbl${lvBump}" data-li-label="${nd.i}-${lv.li}">${lv.pct}%</span></div>
       <span class="addr">${lv.addr}</span>
       <input type="range" min="0" max="100" value="${lv.pct}" class="slider" style="--p:${lv.pct}"
              id="lvl_${nd.i}_${lv.li}" data-act="level-input" data-node="${nd.i}" data-li="${lv.li}"></div>`;
