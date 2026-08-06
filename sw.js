@@ -3,7 +3,7 @@
 // API browser, non richiede rete) quindi l'app e' usabile anche senza
 // connessione dopo il primo caricamento.
 
-const CACHE_NAME = 'mesh-gateway-pwa-v75';
+const CACHE_NAME = 'mesh-gateway-pwa-v76';
 const ASSETS = [
   './',
   'index.html',
