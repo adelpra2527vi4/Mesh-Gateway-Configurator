@@ -428,7 +428,7 @@ export function renderState(state) {
   // Popola luxRawLive dai dati SENSOR_DATA nell'aggiornamento di stato
   // (backup per quando non sono ancora arrivati push SENSOR)
   for (const nd of (state.nodes || [])) {
-    if (nd.kind === 1 && nd.sensor && nd.sensor.light >= 0) {
+    if ((nd.kind & 2) && nd.sensor && nd.sensor.light >= 0) {
       if (luxRawLive[nd.i] === undefined) luxRawLive[nd.i] = nd.sensor.light / 100;
     }
   }
@@ -524,8 +524,8 @@ function bumpIfChanged(el, newVal, key) {
 }
 
 function renderMesh() {
-  const nl = lastState.nodes.filter(n => !n.sw && n.kind === 0).length;
-  const ns = lastState.nodes.filter(n => !n.sw && n.kind === 1).length;
+  const nl = lastState.nodes.filter(n => !n.sw && (n.kind & 1)).length;
+  const ns = lastState.nodes.filter(n => !n.sw && (n.kind & 2)).length;
   bumpIfChanged(document.getElementById('st-lamps'), nl, 'lamps');
   bumpIfChanged(document.getElementById('st-sens'), ns, 'sens');
   document.getElementById('st-busy').textContent = lastState.busy ? 'Config...' : 'Pronto';
@@ -643,12 +643,11 @@ function renderNodes() {
   const act = document.activeElement;
   let editingId = null, editingVal = null, editingSel = null;
   if (act && act.id && box.contains(act)) {
-    // <select> Lampada/Sensore aperto (menu a tendina nativo): un re-render
-    // qui distrugge l'elemento sotto al popup e lo fa chiudere di scatto -
-    // "gioco di velocita'" - vedi conversazione. Stessa protezione del campo
-    // nome, ma senza bisogno di preservare valore/selezione: basta saltare
-    // il render finche' l'utente non chiude il menu da solo.
-    if (act.id.startsWith('kind_')) return;
+    // Checkbox Lampada/Sensore in corso di click: un re-render qui
+    // ricostruisce il DOM sotto al dito/mouse esattamente mentre il
+    // browser sta processando il toggle - stessa protezione che aveva il
+    // vecchio <select> unico, ora su entrambe le checkbox indipendenti.
+    if (act.id.startsWith('kindlamp_') || act.id.startsWith('kindsens_')) return;
     // Slider luminosita' in trascinamento: un re-render qui sostituisce il
     // range sotto al dito/mouse e il pallino "scatta" indietro alla vecchia
     // posizione - stessa protezione degli altri controlli interattivi.
@@ -698,21 +697,37 @@ function renderNode(nd) {
   const offline = nd.cfg && !nd.online;
   const stCls = offline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
   const stTxt = offline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
-  const sel = `<select id="kind_${nd.i}" data-act="setkind" data-node="${nd.i}">
-      <option value="0" ${nd.kind===0?'selected':''}>Lampada</option>
-      <option value="1" ${nd.kind===1?'selected':''}>Sensore</option></select>`;
+  // "kind" e' una bitmask (1=lampada, 2=sensore, 3=entrambi), non piu' una
+  // scelta esclusiva: un device combo (es. dongle SR con 2 LED + PIR/LUX)
+  // puo' avere entrambe le capacita' gestite insieme, ognuna con le sue
+  // card e il suo traffico MQTT indipendente - vedi CFG:SETKIND lato
+  // firmware. Due checkbox indipendenti al posto del vecchio <select>
+  // Lampada/Sensore esclusivo.
+  const hasLampKind = (nd.kind & 1) !== 0;
+  const hasSensorKind = (nd.kind & 2) !== 0;
+  const kindPicker = `<span class="kind-picker">
+      <label><input type="checkbox" id="kindlamp_${nd.i}" data-act="setkind" data-node="${nd.i}" data-bit="1" ${hasLampKind ? 'checked' : ''}> Lampada</label>
+      <label><input type="checkbox" id="kindsens_${nd.i}" data-act="setkind" data-node="${nd.i}" data-bit="2" ${hasSensorKind ? 'checked' : ''}> Sensore</label>
+    </span>`;
   const fbtn = `<button class="btn danger sm" data-act="forget" data-node="${nd.i}">Rimuovi</button>`;
-  const grpBadge = nd.kind === 0
+  const grpBadge = hasLampKind
     ? (nd.grp ? `<span class="badge good">Gruppo OK</span>` : `<span class="badge warn">non rebindato</span>`)
     : '';
-  const rbtn = nd.kind === 0 ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
+  const rbtn = hasLampKind ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
 
   let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span></div>`
-    + `<div class="node-meta">${sel} ${rbtn} ${grpBadge} <span style="margin-left:auto">${fbtn}</span></div>`;
+    + `<div class="node-meta">${kindPicker} ${rbtn} ${grpBadge} <span style="margin-left:auto">${fbtn}</span></div>`;
 
   if (!nd.cfg) return head + `<div class="empty" style="margin-top:10px">Non ancora configurato.</div></div>`;
 
-  if (nd.kind === 1) {
+  // Un device combo con entrambi i bit mostra sia le card sensore sia
+  // quelle lampada, una sotto l'altra (prima erano mutuamente esclusive:
+  // if/else su nd.kind === 1, che per un device con 2 LED + PIR/LUX
+  // scartava sempre uno dei due set di dati gia' presenti in nd - vedi
+  // conversazione: "esistono dispositivi che possono avere PIR e Led
+  // assieme").
+  let sensorBlock = '';
+  if (hasSensorKind) {
     const s = nd.sensor;
     const presOn = s && s.pres > 0;
     const pres = !s || s.pres < 0 ? '&mdash;' : (s.pres ? 'Presenza' : 'Assente');
@@ -756,10 +771,15 @@ function renderNode(nd) {
       </div>
     </div>`;
 
-    return head + `<div class="cards">
+    sensorBlock = `<div class="cards">
         <div class="card"><div class="elem-title">Presenza <span class="pill ${presOn?'on':'off'}">${pres}</span></div></div>
         <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>
-      </div>${warn}${calibCard}</div>`;
+      </div>${warn}${calibCard}`;
+  }
+
+  let lampBlock = '';
+  if (!hasLampKind) {
+    return head + sensorBlock + `</div>`;
   }
 
   // Mentre lastState.busy e' true (provisioning/config di un nodo in corso,
@@ -807,8 +827,12 @@ function renderNode(nd) {
        </div>
        <button class="btn sm" data-act="pair" data-node="${nd.i}">Abbina</button> <span class="muted" id="pm_${nd.i}"></span>`;
   const companion = `<div class="card" style="margin-top:10px"><div class="elem-title">Companion switch</div>${pairBox}</div>`;
+  lampBlock = cards + companion;
 
-  return head + cards + companion + `</div>`;
+  // Un nodo combo mostra prima le card sensore (presenza/lux/calibrazione)
+  // e poi quelle lampada (elementi on/off, livelli, companion switch), una
+  // sotto l'altra invece che scartare l'una o l'altra come prima.
+  return head + sensorBlock + lampBlock + `</div>`;
 }
 
 function wireNodeEvents(box) {
@@ -820,8 +844,28 @@ function wireNodeEvents(box) {
       api.sendCmd(`CFG:SETNAME;node=${el.dataset.node};name=${inp ? inp.value : ''}`);
     });
   });
+  // Le due checkbox Lampada/Sensore sono indipendenti ma condividono lo
+  // stesso comando CFG:SETKIND (bitmask 1|2): al cambio di una delle due si
+  // legge anche lo stato attuale dell'altra per comporre il valore
+  // combinato da inviare - un device combo puo' avere entrambe spuntate.
+  // Se l'utente le spunta via entrambe, non c'e' piu' nessuna capacita' da
+  // gestire: si rifiuta l'invio e si ripristina la checkbox appena
+  // deselezionata, cosi' il nodo non resta "orfano" di card in PWA (il
+  // firmware clamperebbe comunque un kind=0 su NODE_KIND_LAMP, ma qui si
+  // evita l'incoerenza visiva di entrambe le checkbox vuote).
   box.querySelectorAll('[data-act="setkind"]').forEach(el => {
-    el.addEventListener('change', () => { api.sendCmd(`CFG:SETKIND;node=${el.dataset.node};kind=${el.value}`); api.afterCmdRefresh(); });
+    el.addEventListener('change', () => {
+      const node = el.dataset.node;
+      const lampChecked = document.getElementById(`kindlamp_${node}`)?.checked;
+      const sensChecked = document.getElementById(`kindsens_${node}`)?.checked;
+      const combined = (lampChecked ? 1 : 0) | (sensChecked ? 2 : 0);
+      if (combined === 0) {
+        el.checked = true;
+        return;
+      }
+      api.sendCmd(`CFG:SETKIND;node=${node};kind=${combined}`);
+      api.afterCmdRefresh();
+    });
   });
   box.querySelectorAll('[data-act="rebind"]').forEach(el => {
     el.addEventListener('click', () => api.sendCmd(`CFG:REBIND;node=${el.dataset.node}`));
