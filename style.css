@@ -7,6 +7,17 @@
    sfumature coerenti (hover/focus/badge) invece di filter:brightness()
    ad-hoc sparsi nel file - vedi conversazione ("uniforma lo stile grafico"). */
 :root{--blue-50:#eef1f8;--blue-100:#d5dcee;--blue-200:#a8b8de;--blue-300:#6d8fc8;--blue-400:#3a66b2;--blue-500:#002e6d;--blue-600:#00256b;--blue-700:#001c50;--blue-800:#001438;--blue-900:#000c24;--blue-950:#00061a}
+/* --accent (#002e6d) e' quasi nero: perfetto come SFONDO pieno con testo
+   bianco sopra (.btn.primary, badge attivi), illeggibile quando usato come
+   COLORE DI TESTO/BORDO sottile su uno sfondo gia' scuro (--bg/--surface) -
+   pulsanti hover, percentuali, valori sensore, titoletti guida sparivano
+   quasi del tutto in dark mode - vedi conversazione ("risolviamo il blu in
+   modalita' scura, non si leggono..."). --accent-text e' la variante per
+   quei casi: un blu piu' chiaro della stessa scala GDS in dark mode (dove
+   serve contrasto), lo stesso --accent invariato in light mode (dove il
+   navy scuro su sfondo chiaro legge gia' benissimo). */
+:root{--accent-text:var(--blue-300)}
+:root.light{--accent-text:var(--accent)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 /* 880px -> ~1600px (limitato al 96% del viewport, non fisso): la connessione
@@ -15,7 +26,7 @@ html{-webkit-text-size-adjust:100%}
    lasciava ancora enormi barre grigie vuote ai lati su un monitor widescreen
    - vedi conversazione ("dovevi recuperare lo spazio delle barre laterali"). */
 body{font-family:'Open Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;max-width:none;margin:0;padding:0 28px 56px;color:var(--text);background:var(--bg);line-height:1.45}
-a{color:var(--accent)}
+a{color:var(--accent-text)}
 h2,h3,h4{color:var(--text);letter-spacing:-.01em}
 h3{font-size:1.05em;margin:22px 0 10px}h4{font-size:.95em;margin:16px 0 6px}
 code{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 5px;font-family:ui-monospace,Menlo,monospace;font-size:.86em}
@@ -41,7 +52,7 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .dot.on.usbmode{background:#2f7bf6}
 .topbar h1{margin:0;font-size:1.18rem;letter-spacing:-.01em;font-weight:700}
 .navbtn,.btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-size:.83rem;font-weight:600;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:7px 13px;background:var(--surface);cursor:pointer;font-family:inherit;line-height:1;transition:border-color .12s,color .12s}
-.btn:hover,.navbtn:hover{border-color:var(--accent);color:var(--accent)}
+.btn:hover,.navbtn:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
 .btn.primary:hover{filter:brightness(1.06);color:var(--accent-fg)}
 /* Ricerca (mesh discovery/sniffer BLE) attiva: blu, stesso colore del LED
@@ -74,7 +85,7 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
    disegnate per una rotazione oraria, stroke non fill) - ruotarla in senso
    orario e' quindi sempre coerente col disegno, senza bisogno di specchiare
    nulla via CSS/transform (fonte di bug in precedenza). */
-.iconbtn.spinning{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+.iconbtn.spinning{color:var(--accent-text);border-color:color-mix(in srgb,var(--accent-text) 45%,var(--border))}
 .iconbtn.spinning svg{animation:refresh-spin .6s linear}
 @keyframes refresh-spin{to{transform:rotate(360deg)}}
 
@@ -135,7 +146,7 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 
 .tabbar{display:flex;gap:6px;margin:6px 0 20px;flex-wrap:wrap}
 .tabbtn{padding:9px 18px;border-radius:999px;font-size:.85em;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;text-decoration:none;font-family:inherit;display:inline-block}
-.tabbtn:hover{border-color:var(--accent);color:var(--accent)}
+.tabbtn:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .tabbtn.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .tabpanel.hidden{display:none}
 
@@ -219,9 +230,9 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 
 .name-input{font-size:1rem;font-weight:700;border:1px solid transparent;border-radius:8px;padding:5px 8px;width:160px;max-width:48vw;background:transparent;color:var(--text)}
 .name-input:hover{border-color:var(--border)}
-.name-input:focus{border-color:var(--accent);background:var(--surface);outline:none}
+.name-input:focus{border-color:var(--accent-text);background:var(--surface);outline:none}
 select,input{font-family:inherit;font-size:.86rem;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 9px}
-select:focus,input:focus{outline:none;border-color:var(--accent)}
+select:focus,input:focus{outline:none;border-color:var(--accent-text)}
 
 /* Il gradiente segue il centro del pallino (thumb), non il bordo della
    barra: un range nativo sposta il centro del thumb solo tra meta'-thumb e
@@ -235,10 +246,10 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
    padding sfalsava l'area dipinta dal gradiente rispetto alla corsa reale
    del pallino di ~9px per lato, la causa del residuo visibile agli
    estremi - va azzerato qui insieme al border, che lo slider non usa. */
-.slider{--thumb-sz:20px;-webkit-appearance:none;appearance:none;box-sizing:border-box;width:100%;height:8px;padding:0;border:none;border-radius:999px;margin:12px 0 2px;background:linear-gradient(90deg,var(--accent) 0,var(--accent) calc(var(--thumb-sz)/2 + (100% - var(--thumb-sz)) * var(--p,0) / 100),var(--border) 0)}
-.slider::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer;box-shadow:var(--shadow)}
-.slider::-moz-range-thumb{box-sizing:border-box;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent);cursor:pointer}
-.pctlbl{font-weight:700;color:var(--accent);font-size:1.05rem}
+.slider{--thumb-sz:20px;-webkit-appearance:none;appearance:none;box-sizing:border-box;width:100%;height:8px;padding:0;border:none;border-radius:999px;margin:12px 0 2px;background:linear-gradient(90deg,var(--accent-text) 0,var(--accent-text) calc(var(--thumb-sz)/2 + (100% - var(--thumb-sz)) * var(--p,0) / 100),var(--border) 0)}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent-text);cursor:pointer;box-shadow:var(--shadow)}
+.slider::-moz-range-thumb{box-sizing:border-box;width:var(--thumb-sz);height:var(--thumb-sz);border-radius:50%;background:var(--surface);border:2px solid var(--accent-text);cursor:pointer}
+.pctlbl{font-weight:700;color:var(--accent-text);font-size:1.05rem}
 .muted{color:var(--muted);font-size:.85rem}
 .empty{border:1px dashed var(--border2);border-radius:12px;padding:20px;text-align:center;color:var(--muted);background:var(--surface)}
 .section-title{display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 10px}
@@ -258,7 +269,7 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
    per farla risaltare subito nella griglia invece di doverla ritrovare a
    occhio tra le altre - vedi conversazione ("migliora il pannello sniffing
    a livello grafico"). */
-.sniff-card-pinned{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.sniff-card-pinned{border-color:var(--accent-text);box-shadow:0 0 0 1px var(--accent-text),var(--shadow)}
 
 /* Barre di segnale RSSI, al posto (o accanto) del solo numero in dBm: colpo
    d'occhio immediato su quanto e' vicino/forte un dispositivo, stessa idea
@@ -288,7 +299,7 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
    indicatori) quando attivo, testo statico e attenuato quando fermo - invece
    di una riga di testo semplice sopra la lista. */
 .sniff-status{display:inline-flex;align-items:center;gap:7px;font-size:.78rem;color:var(--muted);padding:5px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface)}
-.sniff-status.live{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+.sniff-status.live{color:var(--accent-text);border-color:color-mix(in srgb,var(--accent-text) 45%,var(--border))}
 .sniff-status .dot{width:7px;height:7px}
 
 /* Filtri "Solo con nome"/"Solo senza nome" come chip cliccabili invece di
@@ -296,23 +307,23 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
    vedi conversazione. */
 .chip-toggle{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:.78rem;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
 .chip-toggle:hover{border-color:var(--border2);color:var(--text)}
-.chip-toggle.active{background:color-mix(in srgb,var(--accent) 16%,var(--surface));border-color:var(--accent);color:var(--accent)}
+.chip-toggle.active{background:color-mix(in srgb,var(--accent-text) 16%,var(--surface));border-color:var(--accent-text);color:var(--accent-text)}
 
 /* Griglia sniffer: le card compaiono con fadeInUp solo alla prima comparsa
    di un dispositivo (gestito lato JS aggiungendo la classe una volta sola),
    non ad ogni refresh - vedi .animate-fade-in-up sopra. */
 .sniff-grid{align-content:start}
-.dev-name{font-weight:700;font-size:1.02rem;color:var(--accent,var(--green));padding:2px 8px;border-radius:7px;background:color-mix(in srgb,var(--accent,var(--green)) 14%,transparent);border:1px solid color-mix(in srgb,var(--accent,var(--green)) 35%,var(--border))}
+.dev-name{font-weight:700;font-size:1.02rem;color:var(--accent-text,var(--green));padding:2px 8px;border-radius:7px;background:color-mix(in srgb,var(--accent-text,var(--green)) 14%,transparent);border:1px solid color-mix(in srgb,var(--accent-text,var(--green)) 35%,var(--border))}
 /* Popup di aggiornamento: doveva "dare fastidio" finche' non lo si nota
    (nuova versione disponibile = da installare, non da ignorare per giorni)
    - bordo che pulsa con un bagliore acceso + un dot lampeggiante (stesso
    dot-pulse gia' usato per gli altri indicatori di stato) invece di stare
    li' fermo e passare inosservato - vedi conversazione. */
-#update-popup{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--accent);border-radius:12px;padding:12px 16px;font-size:.88rem;font-weight:600;animation:update-popup-in .25s ease,update-popup-glow 1.7s ease-in-out .3s infinite}
-.update-popup-dot{position:relative;width:8px;height:8px;border-radius:50%;flex:none;background:var(--accent)}
+#update-popup{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--accent-text);border-radius:12px;padding:12px 16px;font-size:.88rem;font-weight:600;animation:update-popup-in .25s ease,update-popup-glow 1.7s ease-in-out .3s infinite}
+.update-popup-dot{position:relative;width:8px;height:8px;border-radius:50%;flex:none;background:var(--accent-text)}
 .update-popup-dot::after{content:'';position:absolute;inset:0;border-radius:50%;background:inherit;animation:dot-pulse 1.6s cubic-bezier(0,0,.2,1) infinite}
 @keyframes update-popup-in{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@keyframes update-popup-glow{0%,100%{box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}50%{box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 16px 3px color-mix(in srgb,var(--accent) 60%,transparent)}}
+@keyframes update-popup-glow{0%,100%{box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 0 0 color-mix(in srgb,var(--accent-text) 60%,transparent)}50%{box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 16px 3px color-mix(in srgb,var(--accent-text) 60%,transparent)}}
 /* Pressione del pulsante "Aggiorna" nel popup di update: si comprime subito
    al click (icona/testo invariati, la pagina sta per ricaricarsi da sola) -
    vedi conversazione ("un'animazione sul pulsante appena premuto"). */
@@ -352,9 +363,9 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
 .switch-track{position:absolute;inset:0;background:var(--border2);border-radius:999px;transition:background .15s}
 .switch-track::before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.4);transition:transform .15s}
-.switch input:checked + .switch-track{background:var(--accent)}
+.switch input:checked + .switch-track{background:var(--accent-text)}
 .switch input:checked + .switch-track::before{transform:translateX(16px)}
-.switch input:focus-visible + .switch-track{outline:2px solid var(--accent);outline-offset:2px}
+.switch input:focus-visible + .switch-track{outline:2px solid var(--accent-text);outline-offset:2px}
 
 /* Chip Lampada/Sensore (bitmask kind di un nodo mesh combo): checkbox reale
    nascosto dentro una label-pillola, colorata via :has(input:checked) invece
@@ -368,7 +379,7 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .kind-toggle svg{flex:none;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
 .kind-toggle:hover{border-color:var(--border2);color:var(--text)}
 .kind-toggle:active{transform:scale(.94)}
-.kind-toggle:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.kind-toggle:has(input:focus-visible){outline:2px solid var(--accent-text);outline-offset:2px}
 .kind-toggle.lamp:has(input:checked){background:color-mix(in srgb,var(--yellow) 18%,var(--surface));border-color:var(--yellow);color:var(--yellow)}
 .kind-toggle.lamp:has(input:checked) svg{transform:scale(1.15) rotate(-10deg)}
 .kind-toggle.sensor:has(input:checked){background:color-mix(in srgb,var(--green) 18%,var(--surface));border-color:var(--green);color:var(--green)}
@@ -398,9 +409,9 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
    colpo d'occhio, deve "pesare" di piu' della configurazione sotto -
    vedi conversazione ("dai piu' risalto ai dati"). */
 .reading-row{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
-.reading-chip{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:color-mix(in srgb,var(--accent) 10%,var(--surface2));border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));border-radius:10px;padding:8px 14px;min-width:64px}
+.reading-chip{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:color-mix(in srgb,var(--accent-text) 10%,var(--surface2));border:1px solid color-mix(in srgb,var(--accent-text) 30%,var(--border));border-radius:10px;padding:8px 14px;min-width:64px}
 .reading-key{font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.reading-val{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:1.25rem;color:var(--accent)}
+.reading-val{font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:1.25rem;color:var(--accent-text)}
 .reading-chip-rssi{opacity:.75;background:var(--surface2);border-color:var(--border);padding:6px 12px}
 .reading-chip-rssi .reading-val{color:var(--text);font-weight:600;font-size:.85rem}
 /* Configurazione (nome/mac/regole) demota a pannello richiudibile: niente
@@ -409,7 +420,7 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .slot-edit summary{padding:6px 0;font-size:.8em;color:var(--muted)}
 .slot-edit[open]{padding-bottom:0}
 .byte{border:1px solid var(--border);border-radius:5px;padding:3px 6px;margin:2px;cursor:pointer;font-family:ui-monospace,monospace;display:inline-block;background:var(--surface2);color:var(--text);font-size:.82em;transition:transform .15s}
-.byte:hover{border-color:var(--accent);transform:translateY(-1px)}
+.byte:hover{border-color:var(--accent-text);transform:translateY(-1px)}
 .byte.changed{background:var(--red);color:#fff;border-color:var(--red)}
 /* Lampo al momento esatto in cui un byte cambia valore (non ad ogni
    ridisegno successivo, solo quando la differenza viene rilevata) - il
@@ -422,7 +433,7 @@ details{border:1px solid var(--border);background:var(--surface);border-radius:1
 details[open]{padding-bottom:14px}
 summary{cursor:pointer;font-weight:600;padding:11px 0;font-size:.92em;list-style:none}
 summary::-webkit-details-marker{display:none}
-summary::before{content:'\25B8 ';color:var(--accent)}
+summary::before{content:'\25B8 ';color:var(--accent-text)}
 details[open] summary::before{content:'\25BE '}
 .savebar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:16px 0 6px;margin-top:18px}
 /* Slot sensori a sinistra, guida sempre visibile a destra (fianco a fianco):
@@ -433,7 +444,7 @@ details[open] summary::before{content:'\25BE '}
 .sensor-setup-layout{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
 .sensor-setup-main{flex:1 1 0;min-width:280px}
 .rule-help{flex:1 1 0;min-width:280px;position:sticky;top:70px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 16px;max-height:calc(100vh - 90px);overflow-y:auto}
-.rule-help h4{margin:0 0 4px;color:var(--accent)}
+.rule-help h4{margin:0 0 4px;color:var(--accent-text)}
 .rule-help-body{font-size:.86rem;line-height:1.55}
 .rule-help-body p{margin:8px 0}
 .rule-help-body ul{margin:6px 0 12px 20px}
@@ -490,9 +501,9 @@ details[open] summary::before{content:'\25BE '}
 .qr-modal .muted{margin-top:8px;text-align:center}
 .qr-adjust-row{margin-top:10px;font-size:.82rem}
 .qr-adjust-row label{display:flex;justify-content:space-between;color:var(--muted);margin-bottom:3px}
-.qr-adjust-row input[type="range"]{margin:0;padding:0;width:100%;border:none;accent-color:var(--accent)}
+.qr-adjust-row input[type="range"]{margin:0;padding:0;width:100%;border:none;accent-color:var(--accent-text)}
 .qr-invert-row{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:.85rem;cursor:pointer}
-.qr-invert-row input{accent-color:var(--accent);width:15px;height:15px;padding:0}
+.qr-invert-row input{accent-color:var(--accent-text);width:15px;height:15px;padding:0}
 .qr-video-wrap{position:relative}
 .qr-switch-btn{position:absolute;right:10px;top:10px;background:rgba(20,20,20,.55);color:#fff;border:1px solid rgba(255,255,255,.35);transition:transform .3s ease,background .2s}
 .qr-switch-btn:hover{transform:rotate(180deg);background:rgba(20,20,20,.8)}
@@ -505,14 +516,14 @@ details[open] summary::before{content:'\25BE '}
   linear-gradient(rgba(255,255,255,.35) 1px,transparent 1px),
   linear-gradient(90deg,rgba(255,255,255,.35) 1px,transparent 1px);
   background-size:calc(100%/3) calc(100%/3)}
-.qr-guide-laser{position:absolute;left:2%;right:2%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 8px 1px color-mix(in srgb,var(--accent) 70%,transparent);animation:qr-laser 2.4s ease-in-out infinite}
+.qr-guide-laser{position:absolute;left:2%;right:2%;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--accent-text),transparent);box-shadow:0 0 8px 1px color-mix(in srgb,var(--accent-text) 70%,transparent);animation:qr-laser 2.4s ease-in-out infinite}
 @keyframes qr-laser{0%{top:2%;opacity:0}10%{opacity:1}50%{top:96%;opacity:1}60%{opacity:0}100%{top:2%;opacity:0}}
-.qr-guide-corner{position:absolute;width:26px;height:26px;border:3px solid var(--accent);animation:qr-corner-glow 2.4s ease-in-out infinite}
+.qr-guide-corner{position:absolute;width:26px;height:26px;border:3px solid var(--accent-text);animation:qr-corner-glow 2.4s ease-in-out infinite}
 .qr-guide-corner.tl{top:-3px;left:-3px;border-right:none;border-bottom:none}
 .qr-guide-corner.tr{top:-3px;right:-3px;border-left:none;border-bottom:none;animation-delay:.15s}
 .qr-guide-corner.bl{bottom:-3px;left:-3px;border-right:none;border-top:none;animation-delay:.3s}
 .qr-guide-corner.br{bottom:-3px;right:-3px;border-left:none;border-top:none;animation-delay:.45s}
-@keyframes qr-corner-glow{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 4px var(--accent))}}
+@keyframes qr-corner-glow{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 4px var(--accent-text))}}
 
 #reset-countdown{display:none;background:var(--yellow);color:#1a1a2e;font-weight:700;padding:10px 14px;border-radius:10px;margin:10px 0}
 #banner-nosupport{display:none;background:var(--red);color:#fff;padding:10px 14px;text-align:center;font-weight:600}
@@ -598,7 +609,7 @@ details[open] summary::before{content:'\25BE '}
 
 .connect-menu-item svg {
   flex: none;
-  color: var(--accent);
+  color: var(--accent-text);
   transition: transform 0.15s ease;
 }
 
@@ -607,7 +618,7 @@ details[open] summary::before{content:'\25BE '}
 .connect-menu-item:focus-visible {
   background: var(--surface2);
   border-color: var(--border2);
-  color: var(--accent);
+  color: var(--accent-text);
   outline: none;
 }
 
