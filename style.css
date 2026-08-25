@@ -168,18 +168,22 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 @keyframes valueBump{0%{transform:scale(1)}35%{transform:scale(1.12)}100%{transform:scale(1)}}
 .animate-value-bump{display:inline-block;animation:valueBump .35s ease-out}
 
-/* Stats ingrandite e centrate (erano piccole e allineate a sinistra) - vedi
-   conversazione. Su telefono (sotto 480px) le card passano a piena
-   larghezza impilate invece di restringersi in una riga a tre finche' il
-   numero non diventa illeggibile. */
-.stats{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 20px;justify-content:center}
-.stat{flex:1 1 200px;max-width:280px;border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:16px 20px;box-shadow:var(--shadow);text-align:center}
-.stat .num{font-size:2.1rem;font-weight:800;line-height:1.1}
-.stat .lbl{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:2px}
+/* Stats leggermente ingrandite e centrate come blocco (erano piccole e
+   allineate a sinistra) - vedi conversazione. Il primo tentativo (card
+   grandi, testo centrato al loro interno) risultava sproporzionato - un
+   numero solitario perso in tanto spazio bianco "a occhio di ciclope" -
+   quindi qui: card piu' contenute (max-width ridotto, si stringono intorno
+   al contenuto invece di allargarsi), testo di nuovo allineato a sinistra
+   come le altre card dell'app, aumento di dimensione piu' misurato. Su
+   telefono (sotto 480px) passano comunque a piena larghezza impilate. */
+.stats{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 18px;justify-content:center}
+.stat{flex:0 1 160px;max-width:200px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 18px;box-shadow:var(--shadow)}
+.stat .num{font-size:1.7rem;font-weight:700;line-height:1.15}
+.stat .lbl{font-size:.76rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-top:1px}
 .stat.busy .num{color:var(--yellow)}
 @media (max-width:480px){
   .stats{gap:10px}
-  .stat{flex:1 1 100%;max-width:360px}
+  .stat{flex:1 1 100%;max-width:320px}
 }
 .bar{display:flex;align-items:center;gap:12px;margin:0 0 18px;flex-wrap:wrap}
 #banner{display:none;border:1px solid var(--red);background:color-mix(in srgb,var(--red) 12%,var(--surface));color:var(--red);padding:9px 13px;border-radius:11px;font-weight:600;font-size:.9rem;margin:0 0 14px}
