@@ -144,14 +144,16 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 @keyframes moon-appear{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
 @keyframes moon-disappear{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(14px)}}
 
-/* Tabbar ingrandita e centrata (era piccola e allineata a sinistra) - vedi
-   conversazione. flex-wrap + justify-content:center bastano da soli per
-   l'adattamento da telefono: sotto una certa larghezza i pulsanti vanno a
-   capo restando comunque centrati, nessuna media query dedicata necessaria
-   qui (i pulsanti sono gia' piccoli abbastanza da stare su una riga anche
-   stretta, o al massimo su due). */
-.tabbar{display:flex;gap:10px;margin:10px 0 26px;flex-wrap:wrap;justify-content:center}
-.tabbtn{padding:13px 28px;border-radius:999px;font-size:1rem;font-weight:700;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;text-decoration:none;font-family:inherit;display:inline-block}
+/* Tabbar che riempie tutta la larghezza disponibile (era piccola e
+   allineata a sinistra, poi un tentativo centrato ma comunque stretto -
+   risultava sproporzionato su un monitor widescreen): ogni pulsante e'
+   flex:1, si spartiscono in parti uguali l'intera riga invece di restare
+   un gruppetto compatto in mezzo a tanto spazio vuoto - vedi conversazione
+   ("belle ampie, ad espandersi del tutto la larghezza"). Sotto i 480px
+   passano a due righe (flex-wrap) restando comunque a piena larghezza. */
+.tabbar{display:flex;gap:10px;margin:10px 0 26px}
+.tabbtn{flex:1;text-align:center;padding:14px 20px;border-radius:12px;font-size:1.05rem;font-weight:700;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;text-decoration:none;font-family:inherit;display:inline-block}
+@media (max-width:480px){.tabbar{flex-wrap:wrap}.tabbtn{flex:1 1 40%}}
 .tabbtn:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .tabbtn.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .tabpanel.hidden{display:none}
@@ -168,22 +170,18 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 @keyframes valueBump{0%{transform:scale(1)}35%{transform:scale(1.12)}100%{transform:scale(1)}}
 .animate-value-bump{display:inline-block;animation:valueBump .35s ease-out}
 
-/* Stats leggermente ingrandite e centrate come blocco (erano piccole e
-   allineate a sinistra) - vedi conversazione. Il primo tentativo (card
-   grandi, testo centrato al loro interno) risultava sproporzionato - un
-   numero solitario perso in tanto spazio bianco "a occhio di ciclope" -
-   quindi qui: card piu' contenute (max-width ridotto, si stringono intorno
-   al contenuto invece di allargarsi), testo di nuovo allineato a sinistra
-   come le altre card dell'app, aumento di dimensione piu' misurato. Su
-   telefono (sotto 480px) passano comunque a piena larghezza impilate. */
-.stats{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 18px;justify-content:center}
-.stat{flex:0 1 160px;max-width:200px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:12px 18px;box-shadow:var(--shadow)}
-.stat .num{font-size:1.7rem;font-weight:700;line-height:1.15}
-.stat .lbl{font-size:.76rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-top:1px}
+/* Stats che riempiono tutta la larghezza disponibile, stessa idea della
+   tabbar sopra: ogni card e' flex:1, tre card in parti uguali su tutta la
+   riga invece di un gruppetto compatto - vedi conversazione ("belle ampie,
+   ad espandersi del tutto la larghezza in 16:9"). Sotto i 480px impilate a
+   piena larghezza (una per riga, troppo strette altrimenti in tre). */
+.stats{display:flex;gap:14px;margin:0 0 20px}
+.stat{flex:1;border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:16px 22px;box-shadow:var(--shadow)}
+.stat .num{font-size:2rem;font-weight:700;line-height:1.15}
+.stat .lbl{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:2px}
 .stat.busy .num{color:var(--yellow)}
 @media (max-width:480px){
-  .stats{gap:10px}
-  .stat{flex:1 1 100%;max-width:320px}
+  .stats{flex-direction:column;gap:10px}
 }
 .bar{display:flex;align-items:center;gap:12px;margin:0 0 18px;flex-wrap:wrap}
 #banner{display:none;border:1px solid var(--red);background:color-mix(in srgb,var(--red) 12%,var(--surface));color:var(--red);padding:9px 13px;border-radius:11px;font-weight:600;font-size:.9rem;margin:0 0 14px}
