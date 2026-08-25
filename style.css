@@ -374,10 +374,15 @@ select:focus,input:focus{outline:none;border-color:var(--accent-text)}
    gia' solo Chrome/Edge (Web Serial/Web Bluetooth), :has() e' supportato -
    vedi conversazione ("migliora la grafica delle spunte lampada/sensore"). */
 .kind-picker{display:inline-flex;gap:6px;flex-wrap:wrap}
-.kind-toggle{position:relative;display:inline-flex;align-items:center;gap:6px;padding:6px 13px 6px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:.8rem;font-weight:600;cursor:pointer;user-select:none;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .12s ease}
+/* Stessa geometria di .btn.sm (raggio 9px, padding, font-size) invece della
+   forma a pillola di prima: doveva stare in fila con Rebind/Rimuovi/gli
+   altri .btn della card, non spiccare come elemento di un'altra famiglia
+   grafica - vedi conversazione ("uguali agli altri pulsanti, sono una voce
+   fuori dal coro"). */
+.kind-toggle{position:relative;display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.78rem;font-weight:600;line-height:1;font-family:inherit;cursor:pointer;user-select:none;transition:background .18s ease,border-color .18s ease,color .18s ease,transform .12s ease}
 .kind-toggle input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
 .kind-toggle svg{flex:none;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
-.kind-toggle:hover{border-color:var(--border2);color:var(--text)}
+.kind-toggle:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .kind-toggle:active{transform:scale(.94)}
 .kind-toggle:has(input:focus-visible){outline:2px solid var(--accent-text);outline-offset:2px}
 .kind-toggle.lamp:has(input:checked){background:color-mix(in srgb,var(--yellow) 18%,var(--surface));border-color:var(--yellow);color:var(--yellow)}
