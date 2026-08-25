@@ -7,9 +7,7 @@ let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferP
 let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
 
 // Scanner QR companion: decodifica via jsQR (vendor/jsQR.min.js, libreria
-// locale nel progetto, MIT) invece dell'API nativa BarcodeDetector - quella
-// si e' rivelata non disponibile su Chrome desktop/Windows in pratica (solo
-// Android/ChromeOS l'hanno affidabilmente), vedi conversazione. jsQR lavora
+// locale nel progetto, MIT). jsQR lavora
 // su un frame video catturato in canvas e funziona in qualsiasi browser
 // moderno, restando comunque un file locale (nessuna CDN a runtime, ok per
 // GitHub Pages offline).
@@ -295,6 +293,10 @@ let lastSniffDevs = [];
 let pinnedMac = null;
 let everChanged = {}; // key mac|TYPE|id|offset -> true una volta cambiato, resta evidenziato
 let prevHex = {};     // key mac|TYPE|id -> ultimo hex visto, per il confronto
+// Mac gia' visti almeno una volta: la card riceve l'animazione di comparsa
+// (fadeInUp) solo la prima volta che appare, non ad ogni refresh successivo
+// della lista - vedi conversazione ("migliora il pannello sniffing").
+let seenSniffMacs = new Set();
 
 export function init(a) {
   api = a;
@@ -325,23 +327,27 @@ export function init(a) {
   document.getElementById('sniffbtn').addEventListener('click', toggleSniffer);
   document.getElementById('sniffclearbtn').addEventListener('click', () => {
     lastSniffDevs = [];
-    pinnedMac = null; everChanged = {}; prevHex = {};
+    pinnedMac = null; everChanged = {}; prevHex = {}; seenSniffMacs = new Set();
     renderSnifferList();
   });
   document.getElementById('sniffsearch').addEventListener('input', () => renderSnifferList());
 
-  // Spunte "Solo con nome" / "Solo senza nome (solo MAC)": mutuamente
-  // esclusive (attivarne una spegne l'altra), cosi' il filtro resta sempre
-  // univoco invece di poter combaciare a un risultato vuoto - vedi
-  // conversazione ("metti delle spunte per filtrare i dispositivi ble").
+  // Chip "Solo con nome" / "Solo senza nome (solo MAC)": mutuamente esclusive
+  // (attivarne una spegne l'altra), cosi' il filtro resta sempre univoco
+  // invece di poter combaciare a un risultato vuoto - vedi conversazione
+  // ("metti delle spunte per filtrare i dispositivi ble").
   const filterNamedEl = document.getElementById('sniff-filter-named');
   const filterUnnamedEl = document.getElementById('sniff-filter-unnamed');
-  filterNamedEl.addEventListener('change', () => {
-    if (filterNamedEl.checked) filterUnnamedEl.checked = false;
+  filterNamedEl.addEventListener('click', () => {
+    const nowActive = !filterNamedEl.classList.contains('active');
+    filterNamedEl.classList.toggle('active', nowActive);
+    if (nowActive) filterUnnamedEl.classList.remove('active');
     renderSnifferList();
   });
-  filterUnnamedEl.addEventListener('change', () => {
-    if (filterUnnamedEl.checked) filterNamedEl.checked = false;
+  filterUnnamedEl.addEventListener('click', () => {
+    const nowActive = !filterUnnamedEl.classList.contains('active');
+    filterUnnamedEl.classList.toggle('active', nowActive);
+    if (nowActive) filterNamedEl.classList.remove('active');
     renderSnifferList();
   });
 }
@@ -1211,12 +1217,26 @@ function renderByteRow(mac, type, id, hex) {
   let row = `<div style="font-size:.85em;margin-top:4px">${label}`;
   bytes.forEach((b, i) => {
     const offKey = key + '|' + i;
-    if (prevBytes[i] !== undefined && prevBytes[i] !== b) everChanged[offKey] = true;
-    const cls = everChanged[offKey] ? 'byte changed' : 'byte';
+    // "Appena cambiato" solo su QUESTA chiamata (confronto con l'hex della
+    // volta precedente, sotto sovrascritto subito dopo): fa scattare il
+    // lampo byte-flash una volta sola, non ad ogni ridisegno successivo
+    // della stessa riga - vedi conversazione ("migliora il pannello
+    // sniffing a livello... animativo").
+    const justChanged = prevBytes[i] !== undefined && prevBytes[i] !== b;
+    if (justChanged) everChanged[offKey] = true;
+    let cls = everChanged[offKey] ? 'byte changed' : 'byte';
+    if (justChanged) cls += ' byte-flash';
     row += `<span class="${cls}" title="offset ${i}" data-act="fillrule" data-type="${type}" data-id="${id}" data-off="${i}">${b}</span>`;
   });
   prevHex[key] = hex;
   return row + '</div>';
+}
+
+// Barre di segnale RSSI (4 tacche), colorate per soglia: verde/oro/rosso -
+// vedi .sig-bars in style.css.
+function renderSigBars(rssi) {
+  const lvl = rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -80 ? 2 : 1;
+  return `<span class="sig-bars lvl-${lvl}"><i></i><i></i><i></i><i></i></span>`;
 }
 
 export function renderSniffer(devs) {
@@ -1235,8 +1255,8 @@ export function renderSniffer(devs) {
 
 function renderSnifferList() {
   const q = (document.getElementById('sniffsearch').value || '').toUpperCase();
-  const onlyNamed = document.getElementById('sniff-filter-named').checked;
-  const onlyUnnamed = document.getElementById('sniff-filter-unnamed').checked;
+  const onlyNamed = document.getElementById('sniff-filter-named').classList.contains('active');
+  const onlyUnnamed = document.getElementById('sniff-filter-unnamed').classList.contains('active');
   let base = pinnedMac ? lastSniffDevs.filter(d => d.mac === pinnedMac) : lastSniffDevs;
   if (onlyNamed) base = base.filter(d => !!d.name);
   else if (onlyUnnamed) base = base.filter(d => !d.name);
@@ -1244,12 +1264,15 @@ function renderSnifferList() {
 
   const anyFilter = !!(q || pinnedMac || onlyNamed || onlyUnnamed);
   const total = lastSniffDevs.length;
-  const statusLine = snifferOn
-    ? `<span style="font-size:.85em;opacity:.7">${total} dispositivi in memoria${anyFilter ? ` (${filtered.length} visibili)` : ''}</span>`
+  const statusEl = document.getElementById('sniff-status');
+  statusEl.classList.toggle('live', snifferOn);
+  statusEl.innerHTML = snifferOn
+    ? `<span class="dot on"></span>${total} dispositivi in memoria${anyFilter ? ` (${filtered.length} visibili)` : ''}`
     : total > 0
-      ? `<span style="font-size:.85em;opacity:.6"><i>Sniffer fermo — ${total} dispositivi congelati. "Pulisci lista" per azzerare.</i></span>`
-      : '';
-  let h = statusLine ? `<p style="margin:0 0 8px;grid-column:1/-1">${statusLine}</p>` : '';
+      ? `${total} dispositivi congelati &mdash; "Pulisci lista" per azzerare`
+      : 'Sniffer fermo';
+
+  let h = '';
   const sorted = [...filtered].sort((a, b) => b.rssi - a.rssi); // dal più vicino al più lontano
   sorted.forEach(d => {
     // Stessa gerarchia visiva della lista "dispositivi rilevati" del tab
@@ -1258,20 +1281,26 @@ function renderSnifferList() {
     const nameStr = d.name
       ? `<span class="dev-name">${d.name}</span>`
       : `<span class="muted">(nome sconosciuto)</span>`;
-    h += `<div class="dev-card sniff-card">
-      <div class="sniff-card-head">${nameStr}<span class="rssi">${d.rssi} dBm</span></div>
+    const isPinned = pinnedMac === d.mac;
+    // fadeInUp solo la primissima volta che un mac compare in lista, non ad
+    // ogni refresh - vedi seenSniffMacs sopra.
+    const isNew = !seenSniffMacs.has(d.mac);
+    seenSniffMacs.add(d.mac);
+    const cardCls = 'dev-card sniff-card' + (isPinned ? ' sniff-card-pinned' : '') + (isNew ? ' animate-fade-in-up' : '');
+    h += `<div class="${cardCls}">
+      <div class="sniff-card-head">${nameStr}<span class="rssi">${renderSigBars(d.rssi)}${d.rssi} dBm</span></div>
       <div class="addr" style="font-family:ui-monospace,Menlo,monospace">${d.mac}</div>
       <div class="sniff-card-actions">
         <button type="button" class="btn sm" data-act="usemac" data-mac="${d.mac}">Usa MAC</button>
         <button type="button" class="btn sm" data-act="copymac" data-mac="${d.mac}">Copia MAC</button>
-        <button type="button" class="btn sm" data-act="togglepin" data-mac="${d.mac}">${pinnedMac===d.mac?'Mostra tutti':'Isola sensore'}</button>
+        <button type="button" class="btn sm${isPinned ? ' primary' : ''}" data-act="togglepin" data-mac="${d.mac}">${isPinned ? 'Mostra tutti' : 'Isola sensore'}</button>
       </div>`;
     if (d.svc_hex) h += renderByteRow(d.mac, 'SVC', d.svc_uuid, d.svc_hex);
     if (d.mfr_hex) h += renderByteRow(d.mac, 'MFR', '0', d.mfr_hex);
     h += '</div>';
   });
   const list = document.getElementById('snifflist');
-  list.innerHTML = h || (anyFilter ? '<i>Nessun dispositivo trovato con questo filtro.</i>' : '<i>Nessun dispositivo rilevato finora...</i>');
+  list.innerHTML = h || `<div class="empty" style="grid-column:1/-1">${anyFilter ? 'Nessun dispositivo trovato con questo filtro.' : 'Nessun dispositivo rilevato finora...'}</div>`;
 
   list.querySelectorAll('[data-act="usemac"]').forEach(b => {
     b.addEventListener('click', () => {

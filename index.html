@@ -112,21 +112,25 @@
     <div class="sensor-setup-main">
     <details open class="setup-sniffer-col">
       <summary>Sniffer BLE (trova mac e payload di un sensore nuovo)</summary>
-      <p>Slot di destinazione:
-        <select id="sniffslot">
-          <option value="0">1</option><option value="1">2</option><option value="2">3</option>
-          <option value="3">4</option><option value="4">5</option><option value="5">6</option>
-          <option value="6">7</option><option value="7">8</option>
-        </select>
-        <button type="button" id="sniffbtn" class="btn sm">Avvia sniffer</button>
-        <button type="button" id="sniffclearbtn" class="btn sm">Pulisci lista</button>
-      </p>
-      <p><input type="text" id="sniffsearch" placeholder="Cerca per mac o nome..."></p>
-      <p class="qr-invert-row" style="gap:18px">
-        <label class="qr-invert-row" style="margin:0"><input type="checkbox" id="sniff-filter-named"> Solo con nome</label>
-        <label class="qr-invert-row" style="margin:0"><input type="checkbox" id="sniff-filter-unnamed"> Solo senza nome (solo MAC)</label>
-      </p>
-      <div id="snifflist" class="cards-grid"><i>Sniffer fermo.</i></div>
+      <div class="sniff-toolbar">
+        <div class="sniff-toolbar-row">
+          <span class="muted" style="font-size:.85rem">Slot di destinazione</span>
+          <select id="sniffslot">
+            <option value="0">1</option><option value="1">2</option><option value="2">3</option>
+            <option value="3">4</option><option value="4">5</option><option value="5">6</option>
+            <option value="6">7</option><option value="7">8</option>
+          </select>
+          <button type="button" id="sniffbtn" class="btn sm">Avvia sniffer</button>
+          <button type="button" id="sniffclearbtn" class="btn sm">Pulisci lista</button>
+          <span id="sniff-status" class="sniff-status"></span>
+        </div>
+        <div class="sniff-toolbar-row">
+          <input type="text" id="sniffsearch" class="sniff-search" placeholder="Cerca per mac o nome...">
+          <button type="button" class="chip-toggle" id="sniff-filter-named">Solo con nome</button>
+          <button type="button" class="chip-toggle" id="sniff-filter-unnamed">Solo senza nome (solo MAC)</button>
+        </div>
+      </div>
+      <div id="snifflist" class="cards-grid sniff-grid"><div class="empty" style="grid-column:1/-1">Sniffer fermo. Premi &laquo;Avvia sniffer&raquo; per iniziare la ricerca.</div></div>
     </details>
     <p><button type="button" id="btn-resetallsensors" class="btn danger sm">Pulisci tutti gli slot</button></p>
     <div id="sensor-slots" class="cards-grid"></div>
