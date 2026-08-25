@@ -395,6 +395,7 @@ export function setConnected(connected) {
     provisioningDevice = null;
     lastStatsShown = { lamps: null, sens: null };
     lastNodeVals = {};
+    kindPending = {};
   }
 }
 
@@ -533,6 +534,10 @@ export function applyPush(detail) {
 let lastStatsShown = { lamps: null, sens: null };
 // Stessa idea per-nodo (lettura lux dei sensori BLE mesh): { [nd.i]: { lux } }
 let lastNodeVals = {};
+// Stato ottimistico delle spunte Lampada/Sensore appena cambiate dall'utente,
+// finche' il firmware non conferma (o scade come rete di sicurezza) - vedi
+// il commento in renderNode() sul bug "non fa deselezionare Lampada...".
+let kindPending = {}; // { [nd.i]: { combined, until } }
 
 function bumpIfChanged(el, newVal, key) {
   el.textContent = newVal;
@@ -724,11 +729,26 @@ function renderNode(nd) {
   // card e il suo traffico MQTT indipendente - vedi CFG:SETKIND lato
   // firmware. Due checkbox indipendenti al posto del vecchio <select>
   // Lampada/Sensore esclusivo.
-  const hasLampKind = (nd.kind & 1) !== 0;
-  const hasSensorKind = (nd.kind & 2) !== 0;
+  //
+  // BUG FIX ("non fa deselezionare Lampada mantenendo Sensore"): il valore
+  // mostrato non viene piu' letto SOLO da nd.kind (che riflette l'ULTIMO
+  // stato confermato dal firmware). Se un poll periodico arriva PRIMA che
+  // il firmware abbia processato/ripubblicato il CFG:SETKIND appena
+  // inviato, renderNode veniva richiamato con l'nd.kind ancora VECCHIO e
+  // "resuscitava" la spunta appena tolta dall'utente. kindPending tiene lo
+  // stato ottimistico appena scelto per qualche secondo, finche' nd.kind
+  // non lo conferma davvero (o scade, come rete di sicurezza) - vedi
+  // kindPending piu' sotto e il listener "change" in wireNodeEvents.
+  const pending = kindPending[nd.i];
+  const pendingLive = pending && pending.until > Date.now() && pending.combined !== nd.kind;
+  const hasLampKind = pendingLive ? (pending.combined & 1) !== 0 : (nd.kind & 1) !== 0;
+  const hasSensorKind = pendingLive ? (pending.combined & 2) !== 0 : (nd.kind & 2) !== 0;
+  if (pending && !pendingLive) delete kindPending[nd.i]; // confermato dal firmware o scaduto
+  const bulbIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.5.4.8 1 .8 1.7v.1h6.4v-.1c0-.7.3-1.3.8-1.7A7 7 0 0 0 12 2Z"/></svg>`;
+  const sensorIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 14 3-9 2 5h4"/></svg>`;
   const kindPicker = `<span class="kind-picker">
-      <label><input type="checkbox" id="kindlamp_${nd.i}" data-act="setkind" data-node="${nd.i}" data-bit="1" ${hasLampKind ? 'checked' : ''}> Lampada</label>
-      <label><input type="checkbox" id="kindsens_${nd.i}" data-act="setkind" data-node="${nd.i}" data-bit="2" ${hasSensorKind ? 'checked' : ''}> Sensore</label>
+      <label class="kind-toggle lamp"><input type="checkbox" id="kindlamp_${nd.i}" data-act="setkind" data-node="${nd.i}" data-bit="1" ${hasLampKind ? 'checked' : ''}>${bulbIcon}Lampada</label>
+      <label class="kind-toggle sensor"><input type="checkbox" id="kindsens_${nd.i}" data-act="setkind" data-node="${nd.i}" data-bit="2" ${hasSensorKind ? 'checked' : ''}>${sensorIcon}Sensore</label>
     </span>`;
   const fbtn = `<button class="btn danger sm" data-act="forget" data-node="${nd.i}">Rimuovi</button>`;
   const grpBadge = hasLampKind
@@ -884,6 +904,11 @@ function wireNodeEvents(box) {
         el.checked = true;
         return;
       }
+      // Stato ottimistico per qualche secondo: copre la finestra tra
+      // l'invio del comando e la conferma del firmware, cosi' un poll che
+      // arriva nel mezzo non fa "risorgere" la spunta appena tolta - vedi
+      // kindPending e il commento in renderNode().
+      kindPending[node] = { combined, until: Date.now() + 4000 };
       api.sendCmd(`CFG:SETKIND;node=${node};kind=${combined}`);
       api.afterCmdRefresh();
     });
