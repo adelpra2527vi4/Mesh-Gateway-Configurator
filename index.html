@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"> 
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Terminal Controller</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#002e6d">
@@ -122,6 +122,10 @@
         <button type="button" id="sniffclearbtn" class="btn sm">Pulisci lista</button>
       </p>
       <p><input type="text" id="sniffsearch" placeholder="Cerca per mac o nome..."></p>
+      <p class="qr-invert-row" style="gap:18px">
+        <label class="qr-invert-row" style="margin:0"><input type="checkbox" id="sniff-filter-named"> Solo con nome</label>
+        <label class="qr-invert-row" style="margin:0"><input type="checkbox" id="sniff-filter-unnamed"> Solo senza nome (solo MAC)</label>
+      </p>
       <div id="snifflist" class="cards-grid"><i>Sniffer fermo.</i></div>
     </details>
     <p><button type="button" id="btn-resetallsensors" class="btn danger sm">Pulisci tutti gli slot</button></p>
