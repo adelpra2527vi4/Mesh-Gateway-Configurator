@@ -222,7 +222,15 @@
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then((reg) => {
+    // updateViaCache:'none' - senza, il browser puo' servire sw.js dalla
+    // propria cache HTTP (GitHub Pages manda Cache-Control con qualche
+    // minuto di validita' sui file statici) sia al primo register() sia
+    // sui reg.update() periodici sotto: una versione nuova pubblicata sul
+    // server non veniva rilevata finche' quella cache HTTP non scadeva da
+    // sola, quindi il popup "Nuova versione disponibile" non compariva mai
+    // (o compariva tardi, agganciato a un reg.waiting non piu' aggiornato)
+    // - vedi conversazione ("il pulsante aggiorna... non mi pare funzioni").
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
       // Un nuovo SW gia' in "waiting" al momento della registrazione (es.
       // scaricato in una tab precedente ma mai confermato): mostra subito.
       if (reg.waiting && navigator.serviceWorker.controller) showUpdatePopup(reg);
@@ -273,7 +281,24 @@ function showUpdatePopup(reg) {
     // sembrava che il pulsante non avesse reagito - vedi conversazione.
     updateBtn.disabled = true;
     updateBtn.classList.add('update-btn-pressed');
-    if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+    // Rete di sicurezza: se per qualsiasi motivo il SKIP_WAITING non porta
+    // a un controllerchange (es. reg.waiting gia' diventato null per una
+    // race con un'altra tab, messaggio perso) il popup spariva comunque
+    // dopo 500ms senza che succedesse nient'altro - sembrava un pulsante
+    // rotto invece di un aggiornamento silenziosamente fallito. Se entro
+    // 4s la pagina non e' stata ricaricata dal controllerchange normale
+    // (vedi sotto), forza comunque un reload: nel peggiore dei casi ricarica
+    // la stessa versione, nel migliore recupera l'aggiornamento bloccato.
+    const fallback = setTimeout(() => window.location.reload(), 4000);
+    navigator.serviceWorker.addEventListener('controllerchange', () => clearTimeout(fallback), { once: true });
+    if (reg.waiting) {
+      reg.waiting.postMessage('SKIP_WAITING');
+    } else {
+      // Nessun SW in attesa (gia' promosso da un'altra tab nel frattempo):
+      // il codice nuovo e' comunque gia' attivo, basta ricaricare.
+      clearTimeout(fallback);
+      window.location.reload();
+    }
     setTimeout(() => box.remove(), 500);
   });
 }

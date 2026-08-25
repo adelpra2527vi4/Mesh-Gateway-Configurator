@@ -174,6 +174,12 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .node{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:14px;margin:0 0 14px;box-shadow:var(--shadow)}
 .node-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 .node-head .idx{font-size:.78rem;color:var(--muted);font-weight:600}
+/* Contenitore stile-badge intorno a "#N" + indirizzo esadecimale: prima
+   erano due span nudi senza alcun confine visivo, sperduti accanto al pill
+   di stato - vedi conversazione ("mettici qualcosa intorno"). */
+.node-id{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface2);border-radius:7px;padding:3px 9px}
+.node-id .idx{color:var(--muted)}
+.node-id .addr{color:var(--text)}
 /* Dal pulsante "Salva" fino al pill di stato ("Connesso" ecc.): spostati
    tutti in blocco a destra, in battuta col margine destro della card,
    invece di seguire subito il campo nome - lo spazio cosi' liberato va al

@@ -715,7 +715,8 @@ function renderNode(nd) {
   if (nd.sw) {
     const swCls = swOffline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
     const swTxt = swOffline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
-    return `<div class="node"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span>
+    return `<div class="node"><div class="node-head">${nameInput}
+      <span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span>
       <span class="pill ${swCls}">${swTxt}</span>
       <button class="btn danger sm" style="margin-left:auto" data-act="forget" data-node="${nd.i}">Rimuovi</button></div></div>`;
   }
@@ -757,7 +758,7 @@ function renderNode(nd) {
   const rbtn = hasLampKind ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
 
   let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${fbtn}</div>`
-    + `<div class="node-meta">${kindPicker} <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span></span></div>`
+    + `<div class="node-meta">${kindPicker} <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`
     + (rbtn || grpBadge ? `<div class="node-meta" style="margin-top:-2px">${rbtn} ${grpBadge}</div>` : '');
 
   if (!nd.cfg) return head + `<div class="empty" style="margin-top:10px">Non ancora configurato.</div></div>`;

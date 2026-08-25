@@ -2,7 +2,7 @@
 // (niente auto-discovery, vedi spec). Web Serial funziona offline (e' una
 // API browser, non richiede rete) quindi l'app e' usabile anche senza
 // connessione dopo il primo caricamento.
-const CACHE_NAME = 'mesh-gateway-pwa-v83';
+const CACHE_NAME = 'mesh-gateway-pwa-v84';
 const ASSETS = [
   './',
   'index.html',
