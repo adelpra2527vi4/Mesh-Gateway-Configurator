@@ -756,8 +756,8 @@ function renderNode(nd) {
     : '';
   const rbtn = hasLampKind ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
 
-  let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}<span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span></div>`
-    + `<div class="node-meta">${kindPicker} ${rbtn} ${grpBadge} <span style="margin-left:auto">${fbtn}</span></div>`;
+  let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${fbtn}</div>`
+    + `<div class="node-meta">${kindPicker} ${rbtn} ${grpBadge} <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span><span class="pill ${stCls}">${stTxt}</span></span></div>`;
 
   if (!nd.cfg) return head + `<div class="empty" style="margin-top:10px">Non ancora configurato.</div></div>`;
 
