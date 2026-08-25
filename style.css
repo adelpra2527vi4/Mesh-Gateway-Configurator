@@ -255,7 +255,7 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
    d'occhio immediato su quanto e' vicino/forte un dispositivo, stessa idea
    delle barre di campo del telefono. 4 tacche crescenti, colorate in base
    alla soglia (verde/giallo/rosso) invece di un singolo colore fisso. */
-.sig-bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px;flex:none}
+.sig-bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px;margin-right:5px;flex:none;vertical-align:middle}
 .sig-bars i{display:block;width:3px;border-radius:1px;background:var(--border2);font-style:normal}
 .sig-bars i:nth-child(1){height:4px}
 .sig-bars i:nth-child(2){height:7px}

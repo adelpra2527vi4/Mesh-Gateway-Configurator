@@ -636,7 +636,7 @@ function renderDiscovered() {
       ? `<span class="dev-name">${d.name}</span>`
       : pendingPill('Nome in verifica...');
     return `<div class="dev-card${locked ? ' usb-locked' : ''}"><div class="grow">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${nameStr} <span class="rssi">${d.rssi||0} dBm</span></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${nameStr} <span class="rssi">${renderSigBars(d.rssi||0)}${d.rssi||0} dBm</span></div>
         <div style="margin-top:3px;font-family:ui-monospace,monospace">${macFmt}</div>
         <div style="margin-top:3px">${oobTag} ${knownTag} <span class="addr">UUID ${d.uuid.slice(0,8)}...</span></div>
       </div>${btn}</div>`;
