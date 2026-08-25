@@ -163,6 +163,15 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 .node{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:14px;margin:0 0 14px;box-shadow:var(--shadow)}
 .node-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 .node-head .idx{font-size:.78rem;color:var(--muted);font-weight:600}
+/* Dal pulsante "Salva" fino al pill di stato ("Connesso" ecc.): spostati
+   tutti in blocco a destra, in battuta col margine destro della card,
+   invece di seguire subito il campo nome - lo spazio cosi' liberato va al
+   campo nome, che si allarga per riempirlo - vedi conversazione. Selettore
+   sul fratello immediatamente successivo a .name-input (il bottone Salva,
+   unico punto in cui compare questa combinazione) invece di una nuova
+   classe: nessuna modifica a ui.js necessaria. */
+.name-input{flex:1 1 auto}
+.node-head .name-input + button{margin-left:auto}
 .node-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
 .addr{color:var(--muted);font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:10px}
