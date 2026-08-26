@@ -2,7 +2,7 @@
 // (niente auto-discovery, vedi spec). Web Serial funziona offline (e' una
 // API browser, non richiede rete) quindi l'app e' usabile anche senza
 // connessione dopo il primo caricamento.
-const CACHE_NAME = 'mesh-gateway-pwa-v102';
+const CACHE_NAME = 'mesh-gateway-pwa-v103';
 const ASSETS = [
   './',
   'index.html',
@@ -16,9 +16,23 @@ const ASSETS = [
   'vendor/jsQR.min.js',
 ];
 
+// cache.addAll() userebbe fetch() di default, che PUO' essere soddisfatto
+// dalla cache HTTP del browser invece che dalla rete (stesso identico
+// problema gia' risolto per sw.js stesso con updateViaCache:'none' - qui
+// pero' riguarda gli ASSET precaricati, style.css/ui.js/ecc.): un nuovo SW
+// installava correttamente (byte diversi rilevati -> updatefound) ma
+// finiva comunque per mettere in cache uno style.css VECCHIO preso dalla
+// cache HTTP, quindi un aggiornamento CSS/JS poteva non vedersi affatto
+// anche dopo aver confermato il popup "Aggiorna" - vedi conversazione
+// ("identico a prima ed e' la v102 e ho refreshato tutto"). {cache:
+// 'reload'} forza ogni asset precaricato a passare sempre dalla rete.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(ASSETS.map((url) =>
+        fetch(url, { cache: 'reload' }).then((resp) => cache.put(url, resp))
+      ))
+    )
   );
   // NIENTE self.skipWaiting() automatico qui: un nuovo service worker deve
   // restare "waiting" finche' l'utente non conferma dal popup "Aggiorna"
@@ -52,7 +66,10 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cached) => {
       if (cached) {
         // Aggiorna in background per la prossima visita (stale-while-revalidate).
-        fetch(event.request).then((resp) => {
+        // {cache:'reload'} stesso motivo dell'install sopra: senza, questo
+        // fetch potrebbe a sua volta pescare dalla cache HTTP del browser
+        // invece che dalla rete, vanificando l'aggiornamento in background.
+        fetch(event.request, { cache: 'reload' }).then((resp) => {
           if (resp && resp.ok) {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resp));
           }
