@@ -396,9 +396,14 @@ select:focus,input:focus{outline:none;border-color:var(--accent-text)}
 /* Card relè in una riga sola invece che nella griglia a 2 colonne condivisa
    con nodi mesh/beacon: sono poche (tipico 4-8) e quadrate, stanno bene
    affiancate tutte insieme - vedi conversazione. Numero relè ingrandito,
-   e' l'unica etichetta della card quindi puo' permettersi di essere grande. */
+   e' l'unica etichetta della card quindi puo' permettersi di essere grande.
+   flex:1 (era flex:0 0 130px, larghezza fissa) le fa allargare per
+   riempire tutta la riga invece di restare un gruppetto a sinistra con
+   spazio vuoto a destra - vedi conversazione ("occupino tutta la
+   larghezza"). flex-wrap resta per quando i relè sono troppi/lo schermo
+   troppo stretto per stare tutti su una riga anche allargati. */
 #relays{display:flex;flex-wrap:wrap;gap:14px}
-.relay-card{flex:0 0 130px;text-align:center}
+.relay-card{flex:1 1 130px;text-align:center}
 .relay-num{font-size:2.1rem;font-weight:800;color:var(--text);line-height:1}
 /* Toggle switch per "Abilitato" al posto del checkbox nudo con label a
    fianco - vedi conversazione. Basato su un checkbox reale nascosto (resta
