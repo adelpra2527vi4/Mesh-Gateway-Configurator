@@ -503,7 +503,13 @@ details[open] summary::before{content:'\25BE '}
 .node-settings summary:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .node-settings summary::before{content:none}
 .node-settings[open] summary{margin-bottom:10px;border-color:var(--accent-text);color:var(--accent-text)}
-.node-settings-body{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--border);background:var(--surface2);border-radius:12px}
+/* .node-settings-body porta anche la classe .cards (griglia auto-fill gia'
+   usata per le card dati sopra, vedi conversazione "fai piu' card e non
+   una unica"): qui solo il contenitore esterno (bordo/sfondo/padding), il
+   display:grid e il resto del layout li mette gia' .cards. */
+.node-settings-body{padding:12px;border:1px solid var(--border);background:var(--surface2);border-radius:12px}
+.node-settings-body.cards{margin-top:0}
+.node-settings-body .card{background:var(--surface)}
 .node-settings-body .kind-picker{flex-wrap:wrap}
 .savebar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:16px 0 6px;margin-top:18px}
 /* Slot sensori a sinistra, guida sempre visibile a destra (fianco a fianco):

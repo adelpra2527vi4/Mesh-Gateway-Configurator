@@ -404,6 +404,7 @@ export function setConnected(connected) {
     lastStatsShown = { lamps: null, sens: null };
     lastNodeVals = {};
     kindPending = {};
+    openSettingsNodes = new Set();
   }
 }
 
@@ -546,6 +547,14 @@ let lastNodeVals = {};
 // finche' il firmware non conferma (o scade come rete di sicurezza) - vedi
 // il commento in renderNode() sul bug "non fa deselezionare Lampada...".
 let kindPending = {}; // { [nd.i]: { combined, until } }
+// Pannello "Impostazioni" (<details class="node-settings">) aperto da un
+// nodo: renderNodes() ricostruisce l'intero innerHTML ad ogni poll (~2s),
+// quindi un <details> senza stato tracciato a parte torna sempre chiuso al
+// giro successivo anche se l'utente lo aveva appena aperto - vedi
+// conversazione ("non sta aperto da solo"). Popolato/svuotato dal listener
+// "toggle" in wireNodeEvents, riletto qui in renderNode per rimettere
+// l'attributo "open" dove serve.
+let openSettingsNodes = new Set();
 
 function bumpIfChanged(el, newVal, key) {
   el.textContent = newVal;
@@ -783,125 +792,148 @@ function renderNode(nd) {
     companion = `<div class="card"><div class="elem-title">Companion switch</div>${pairBox}</div>`;
   }
   const gearIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
-  // Pannello "Impostazioni" richiudibile: spunte Lampada/Sensore, Rebind/
-  // badge gruppo, Companion switch - tutta roba di configurazione
-  // occasionale, non i controlli operativi (accendi/spegni/livello) che
-  // restano sempre visibili sotto - vedi conversazione ("snellire un po'").
-  // Chiuso di default come gli altri pannelli <details> dell'app.
-  const settingsBody = kindPicker
-    + (rbtn || grpBadge ? `<div>${rbtn} ${grpBadge}</div>` : '')
-    + companion;
-  const settingsPanel = `<details class="node-settings"><summary>${gearIcon}Impostazioni</summary><div class="node-settings-body">${settingsBody}</div></details>`;
 
   let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${fbtn}</div>`
-    + `<div class="node-meta"><span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`
-    + settingsPanel;
+    + `<div class="node-meta"><span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`;
 
-  if (!nd.cfg) return head + `<div class="empty" style="margin-top:10px">Non ancora configurato.</div></div>`;
+  let body = '';
+  // calibCard va nel pannello Impostazioni insieme a spunte/Rebind/
+  // Companion (vedi settingsCards sotto), non piu' accanto alle card dati
+  // sensore - vedi conversazione ("mettu dentro anche la calibrazione
+  // lux"). Dichiarato qui fuori perche' popolato solo se hasSensorKind &&
+  // nd.cfg, ma il pannello Impostazioni si costruisce comunque anche per
+  // un nodo non ancora configurato (kindPicker/Rebind restano utili).
+  let calibCard = '';
 
-  // Un device combo con entrambi i bit mostra sia le card sensore sia
-  // quelle lampada, una sotto l'altra (prima erano mutuamente esclusive:
-  // if/else su nd.kind === 1, che per un device con 2 LED + PIR/LUX
-  // scartava sempre uno dei due set di dati gia' presenti in nd - vedi
-  // conversazione: "esistono dispositivi che possono avere PIR e Led
-  // assieme").
-  let sensorBlock = '';
-  if (hasSensorKind) {
-    const s = nd.sensor;
-    const presOn = s && s.pres > 0;
-    const pres = !s || s.pres < 0 ? '&mdash;' : (s.pres ? 'Presenza' : 'Assente');
-    const curLux = luxRawLive[nd.i] !== undefined ? luxRawLive[nd.i]
-                   : (s && s.light >= 0 ? s.light / 100 : null);
-    const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
-    // "Scatto" (value-bump, style.css) sulla lettura lux solo quando il
-    // valore mostrato cambia davvero rispetto all'ultimo giro - il nodo
-    // viene comunque riscritto per intero ad ogni poll, quindi la classe va
-    // decisa qui in fase di template invece che via classList più sotto.
-    const lastLux = lastNodeVals[nd.i]?.lux;
-    const luxBump = lastLux !== undefined && lastLux !== luxStr ? ' animate-value-bump' : '';
-    lastNodeVals[nd.i] = Object.assign(lastNodeVals[nd.i] || {}, { lux: luxStr });
-    const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
+  if (!nd.cfg) {
+    body = `<div class="empty" style="margin-top:10px">Non ancora configurato.</div>`;
+  } else {
+    // Un device combo con entrambi i bit mostra sia le card sensore sia
+    // quelle lampada, una sotto l'altra (prima erano mutuamente esclusive:
+    // if/else su nd.kind === 1, che per un device con 2 LED + PIR/LUX
+    // scartava sempre uno dei due set di dati gia' presenti in nd - vedi
+    // conversazione: "esistono dispositivi che possono avere PIR e Led
+    // assieme").
+    if (hasSensorKind) {
+      const s = nd.sensor;
+      const presOn = s && s.pres > 0;
+      const pres = !s || s.pres < 0 ? '&mdash;' : (s.pres ? 'Presenza' : 'Assente');
+      const curLux = luxRawLive[nd.i] !== undefined ? luxRawLive[nd.i]
+                     : (s && s.light >= 0 ? s.light / 100 : null);
+      const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
+      // "Scatto" (value-bump, style.css) sulla lettura lux solo quando il
+      // valore mostrato cambia davvero rispetto all'ultimo giro - il nodo
+      // viene comunque riscritto per intero ad ogni poll, quindi la classe
+      // va decisa qui in fase di template invece che via classList più sotto.
+      const lastLux = lastNodeVals[nd.i]?.lux;
+      const luxBump = lastLux !== undefined && lastLux !== luxStr ? ' animate-value-bump' : '';
+      lastNodeVals[nd.i] = Object.assign(lastNodeVals[nd.i] || {}, { lux: luxStr });
+      const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
 
-    // Il firmware applica un fattore moltiplicativo per nodo (sensor_light_cal
-    // in main.c: calibrato = grezzo * fattore / 1000) - un offset additivo
-    // provato prima lasciava il buio (grezzo=0) diverso da 0 dopo calibrazione,
-    // sbagliato per definizione - vedi conversazione. Vedi CFG:SETLUXCALIB.
-    const calib = getNodeCalib(nd.i);
-    const calibSummary = calib && calib.factor_1000
-      ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)} (rif: ${calib.ref_lux||'?'} lux)`
-      : `<span class="badge warn">Non calibrato</span>`;
-    const usbLock = !lastState.usbMode ? ' usb-locked' : '';
-    // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
-    const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
+      // Il firmware applica un fattore moltiplicativo per nodo (sensor_light_cal
+      // in main.c: calibrato = grezzo * fattore / 1000) - un offset additivo
+      // provato prima lasciava il buio (grezzo=0) diverso da 0 dopo calibrazione,
+      // sbagliato per definizione - vedi conversazione. Vedi CFG:SETLUXCALIB.
+      const calib = getNodeCalib(nd.i);
+      const calibSummary = calib && calib.factor_1000
+        ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)} (rif: ${calib.ref_lux||'?'} lux)`
+        : `<span class="badge warn">Non calibrato</span>`;
+      const usbLock = !lastState.usbMode ? ' usb-locked' : '';
+      // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
+      const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
 
-    const calibCard = `<div class="card${usbLock}" style="margin-top:10px">
-      <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
-      <div style="margin:6px 0">
-        <button class="btn sm danger" data-act="calib-zero" data-node="${nd.i}">Azzera calibrazione</button>
-        <span class="muted" style="font-size:0.84em">(passo obbligatorio prima di ri-calibrare, cosi' la lettura attuale torna grezza)</span>
-      </div>
-      <hr style="margin:10px 0;opacity:.3">
-      <div style="margin:8px 0">
-        Dopo aver azzerato e atteso una nuova lettura, confronta con un luxmetro di riferimento
-        e inserisci qui i lux letti dallo strumento:
-        <input type="text" inputmode="numeric" id="cref-${nd.i}" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
-        <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra e invia</button>
-        <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
-      </div>
-    </div>`;
+      calibCard = `<div class="card${usbLock}">
+        <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
+        <div style="margin:6px 0">
+          <button class="btn sm danger" data-act="calib-zero" data-node="${nd.i}">Azzera calibrazione</button>
+          <span class="muted" style="font-size:0.84em">(passo obbligatorio prima di ri-calibrare, cosi' la lettura attuale torna grezza)</span>
+        </div>
+        <hr style="margin:10px 0;opacity:.3">
+        <div style="margin:8px 0">
+          Dopo aver azzerato e atteso una nuova lettura, confronta con un luxmetro di riferimento
+          e inserisci qui i lux letti dallo strumento:
+          <input type="text" inputmode="numeric" id="cref-${nd.i}" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
+          <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra e invia</button>
+          <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
+        </div>
+      </div>`;
 
-    sensorBlock = `<div class="cards">
-        <div class="card"><div class="elem-title">Presenza <span class="pill ${presOn?'on':'off'}">${pres}</span></div></div>
-        <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>
-      </div>${warn}${calibCard}`;
+      body += `<div class="cards">
+          <div class="card"><div class="elem-title">Presenza <span class="pill ${presOn?'on':'off'}">${pres}</span></div></div>
+          <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>
+        </div>${warn}`;
+    }
+
+    if (hasLampKind) {
+      // Mentre lastState.busy e' true (provisioning/config di un nodo in corso,
+      // vedi gateway_is_provisioning() lato firmware che ora blocca anche
+      // CFG:CMD/CFG:LEVEL) blocchiamo qui i controlli sugli ALTRI nodi gia'
+      // configurati, cosi' l'utente non manda comandi che il firmware
+      // rifiuterebbe comunque con CFG:ERR.
+      let cards = `<div class="cards${lastState.busy ? ' usb-locked' : ''}">`;
+      for (const el of nd.elems) {
+        cards += `<div class="card"><div class="elem-title">Elemento #${el.e}<span class="pill ${el.on?'on':'off'}">${el.on?'Acceso':'Spento'}</span></div>
+          <span class="addr">${el.addr}</span>
+          <div class="row-btns">
+            <button class="btn ${el.on?'':'primary'} sm" data-act="cmd" data-node="${nd.i}" data-elem="${el.e}" data-val="1">Accendi</button>
+            <button class="btn sm" data-act="cmd" data-node="${nd.i}" data-elem="${el.e}" data-val="0">Spegni</button>
+            <button class="btn sm" data-act="cmd" data-node="${nd.i}" data-elem="${el.e}" data-val="2">Leggi</button>
+          </div></div>`;
+      }
+      for (const lv of nd.lvls) {
+        // Bump solo su un cambio "esterno" (push/poll dal firmware): mentre
+        // l'utente trascina lo slider, renderNodes() salta il rerender per
+        // intero (protezione anti-refresh sopra), quindi questo ramo non
+        // viene mai raggiunto durante il drag - niente conflitto con
+        // quell'animazione.
+        const lvKey = `${nd.i}-${lv.li}`;
+        const lastLv = lastNodeVals[lvKey]?.pct;
+        const lvBump = lastLv !== undefined && lastLv !== lv.pct ? ' animate-value-bump' : '';
+        lastNodeVals[lvKey] = { pct: lv.pct };
+        cards += `<div class="card"><div class="elem-title">Luminosit&agrave; #${lv.e}<span class="pctlbl${lvBump}" data-li-label="${nd.i}-${lv.li}">${lv.pct}%</span></div>
+          <span class="addr">${lv.addr}</span>
+          <input type="range" min="0" max="100" value="${lv.pct}" class="slider" style="--p:${lv.pct}"
+                 id="lvl_${nd.i}_${lv.li}" data-act="level-input" data-node="${nd.i}" data-li="${lv.li}"></div>`;
+      }
+      cards += `</div>`;
+      body += cards;
+    }
   }
 
-  let lampBlock = '';
-  if (!hasLampKind) {
-    return head + sensorBlock + `</div>`;
-  }
+  // Pannello "Impostazioni" richiudibile: spunte Lampada/Sensore, Rebind/
+  // badge gruppo, Companion switch, Calibrazione Lux - tutta roba di
+  // configurazione occasionale, non i controlli operativi (accendi/
+  // spegni/livello) che restano sempre visibili nel body sopra - vedi
+  // conversazione ("snellire un po'"). Card separate (griglia .cards)
+  // invece di un unico blocco - vedi conversazione ("fai piu' card e non
+  // una unica"). Chiuso di default, ma resta aperto tra un refresh e
+  // l'altro se l'utente lo apre (openSettingsNodes, vedi sopra e il
+  // listener "toggle" in wireNodeEvents) - senza, il poll ogni ~2s lo
+  // richiudeva sotto al dito - vedi conversazione ("non sta aperto da solo").
+  const settingsCards = [
+    `<div class="card">${kindPicker}</div>`,
+    (rbtn || grpBadge) ? `<div class="card">${rbtn} ${grpBadge}</div>` : '',
+    companion,
+    calibCard,
+  ].filter(Boolean).join('');
+  const isOpen = openSettingsNodes.has(nd.i) ? ' open' : '';
+  const settingsPanel = `<details class="node-settings" id="settings_${nd.i}" data-node="${nd.i}"${isOpen}><summary>${gearIcon}Impostazioni</summary><div class="node-settings-body cards">${settingsCards}</div></details>`;
 
-  // Mentre lastState.busy e' true (provisioning/config di un nodo in corso,
-  // vedi gateway_is_provisioning() lato firmware che ora blocca anche
-  // CFG:CMD/CFG:LEVEL) blocchiamo qui i controlli sugli ALTRI nodi gia'
-  // configurati, cosi' l'utente non manda comandi che il firmware
-  // rifiuterebbe comunque con CFG:ERR.
-  let cards = `<div class="cards${lastState.busy ? ' usb-locked' : ''}">`;
-  for (const el of nd.elems) {
-    cards += `<div class="card"><div class="elem-title">Elemento #${el.e}<span class="pill ${el.on?'on':'off'}">${el.on?'Acceso':'Spento'}</span></div>
-      <span class="addr">${el.addr}</span>
-      <div class="row-btns">
-        <button class="btn ${el.on?'':'primary'} sm" data-act="cmd" data-node="${nd.i}" data-elem="${el.e}" data-val="1">Accendi</button>
-        <button class="btn sm" data-act="cmd" data-node="${nd.i}" data-elem="${el.e}" data-val="0">Spegni</button>
-        <button class="btn sm" data-act="cmd" data-node="${nd.i}" data-elem="${el.e}" data-val="2">Leggi</button>
-      </div></div>`;
-  }
-  for (const lv of nd.lvls) {
-    // Bump solo su un cambio "esterno" (push/poll dal firmware): mentre
-    // l'utente trascina lo slider, renderNodes() salta il rerender per
-    // intero (protezione anti-refresh sopra), quindi questo ramo non viene
-    // mai raggiunto durante il drag - niente conflitto con quell'animazione.
-    const lvKey = `${nd.i}-${lv.li}`;
-    const lastLv = lastNodeVals[lvKey]?.pct;
-    const lvBump = lastLv !== undefined && lastLv !== lv.pct ? ' animate-value-bump' : '';
-    lastNodeVals[lvKey] = { pct: lv.pct };
-    cards += `<div class="card"><div class="elem-title">Luminosit&agrave; #${lv.e}<span class="pctlbl${lvBump}" data-li-label="${nd.i}-${lv.li}">${lv.pct}%</span></div>
-      <span class="addr">${lv.addr}</span>
-      <input type="range" min="0" max="100" value="${lv.pct}" class="slider" style="--p:${lv.pct}"
-             id="lvl_${nd.i}_${lv.li}" data-act="level-input" data-node="${nd.i}" data-li="${lv.li}"></div>`;
-  }
-  cards += `</div>`;
-  lampBlock = cards;
-
-  // Un nodo combo mostra prima le card sensore (presenza/lux/calibrazione)
-  // e poi quelle lampada (elementi on/off, livelli), una sotto l'altra
-  // invece che scartare l'una o l'altra come prima. Companion switch e'
-  // ormai dentro il pannello Impostazioni (settingsPanel, gia' incluso in
-  // head) insieme a spunte/Rebind.
-  return head + sensorBlock + lampBlock + `</div>`;
+  return head + settingsPanel + body + `</div>`;
 }
 
 function wireNodeEvents(box) {
+  // Ricorda quali pannelli Impostazioni sono aperti (openSettingsNodes,
+  // vedi sopra) cosi' il prossimo renderNodes() (ogni poll, ~2s) li
+  // ricostruisce gia' aperti invece di richiuderli sotto al dito - vedi
+  // conversazione ("non sta aperto da solo").
+  box.querySelectorAll('.node-settings').forEach(el => {
+    el.addEventListener('toggle', () => {
+      const ni = parseInt(el.dataset.node, 10);
+      if (el.open) openSettingsNodes.add(ni);
+      else openSettingsNodes.delete(ni);
+    });
+  });
   box.querySelectorAll('[data-act="setname"]').forEach(el => {
     el.addEventListener('click', () => {
       const inp = document.getElementById('nm_' + el.dataset.node);
