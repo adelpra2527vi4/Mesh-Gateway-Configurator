@@ -195,8 +195,8 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
    piena larghezza (una per riga, troppo strette altrimenti in tre). */
 .stats{display:flex;gap:14px;margin:0 0 20px}
 .stat{flex:1;border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:16px 22px;box-shadow:var(--shadow);text-align:center}
-.stat .num{font-size:2rem;font-weight:700;line-height:1.15}
-.stat .lbl{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:2px}
+.stat .num{font-size:2rem;font-weight:700;line-height:1.15;margin-top:2px}
+.stat .lbl{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
 .stat.busy .num{color:var(--yellow)}
 @media (max-width:480px){
   .stats{flex-direction:column;gap:10px}
