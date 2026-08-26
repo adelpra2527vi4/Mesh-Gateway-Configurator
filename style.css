@@ -228,7 +228,12 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
    classe: nessuna modifica a ui.js necessaria. */
 .name-input{flex:1 1 auto}
 .node-head .name-input + button{margin-left:auto}
-.node-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+/* align-items:flex-start (era center): col pannello Impostazioni aperto
+   (box alto, contiene tutte le sue card) il gruppo #idx/indirizzo/pill si
+   centrava rispetto a TUTTA quell'altezza, finendo a mezz'aria scollegato
+   dal pulsante Impostazioni invece di restargli affiancato in alto - vedi
+   conversazione ("devono restare al fianco di settings"). */
+.node-meta{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
 .addr{color:var(--muted);font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:10px}
 .card{border:1px solid var(--border);background:var(--surface2);border-radius:12px;padding:12px}
