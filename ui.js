@@ -793,8 +793,7 @@ function renderNode(nd) {
   }
   const gearIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
 
-  let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${fbtn}</div>`
-    + `<div class="node-meta"><span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`;
+  const head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${fbtn}</div>`;
 
   let body = '';
   // calibCard va nel pannello Impostazioni insieme a spunte/Rebind/
@@ -918,8 +917,12 @@ function renderNode(nd) {
   ].filter(Boolean).join('');
   const isOpen = openSettingsNodes.has(nd.i) ? ' open' : '';
   const settingsPanel = `<details class="node-settings" id="settings_${nd.i}" data-node="${nd.i}"${isOpen}><summary>${gearIcon}Impostazioni</summary><div class="node-settings-body cards">${settingsCards}</div></details>`;
+  // Pulsante Impostazioni in linea con #idx/indirizzo/pill di stato (stessa
+  // riga node-meta, non piu' una riga propria sotto) - vedi conversazione
+  // ("metti in linea il pulsante settings a #1 0x0031 Connesso").
+  const meta = `<div class="node-meta">${settingsPanel}<span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`;
 
-  return head + settingsPanel + body + `</div>`;
+  return head + meta + body + `</div>`;
 }
 
 function wireNodeEvents(box) {

@@ -497,7 +497,7 @@ details[open] summary::before{content:'\25BE '}
    usato per "Log seriale"/"Sniffer BLE" - l'utente lo ha chiesto
    esplicitamente come "pulsante settings" - vedi conversazione ("snellire
    un po'"). */
-.node-settings{margin:10px 0 0;padding:0;border:none;background:transparent}
+.node-settings{margin:0;padding:0;border:none;background:transparent}
 .node-settings[open]{padding-bottom:0}
 .node-settings summary{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.78rem;font-weight:600;line-height:1}
 .node-settings summary:hover{border-color:var(--accent-text);color:var(--accent-text)}
