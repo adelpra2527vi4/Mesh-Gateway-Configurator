@@ -520,7 +520,15 @@ details[open] summary::before{content:'\25BE '}
    e #idx/indirizzo/pill continuano a stare sulla stessa riga (margin-left:
    auto su quel gruppo, non su questo). */
 .node-settings{flex:1 1 auto;margin:0;padding:0;border:none;background:transparent}
-.node-settings[open]{padding-bottom:0}
+/* flex-basis:100% da aperto: condividendo la riga con #idx/indirizzo/pill
+   (margin-left:auto), il pannello non puo' MAI essere largo quanto le
+   card sotto (Elemento/Luminosita', che hanno l'intera riga per loro) -
+   vedi conversazione ("manca ancora"). Da aperto si prende quindi tutta
+   la riga per se' (flex-wrap manda #idx/pill a capo, appena sotto invece
+   che di fianco), cosi' le sue card interne arrivano davvero alla stessa
+   larghezza di quelle sotto. Da chiuso resta come prima (nessun flex-basis
+   forzato, piccolo e in linea con #idx/pill). */
+.node-settings[open]{flex-basis:100%;padding-bottom:0}
 .node-settings summary{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.78rem;font-weight:600;line-height:1}
 .node-settings summary:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .node-settings summary::before{content:none}
