@@ -509,7 +509,17 @@ details[open] summary::before{content:'\25BE '}
    usato per "Log seriale"/"Sniffer BLE" - l'utente lo ha chiesto
    esplicitamente come "pulsante settings" - vedi conversazione ("snellire
    un po'"). */
-.node-settings{margin:0;padding:0;border:none;background:transparent}
+/* flex:1 1 auto: senza, il <details> (elemento flessibile nella riga
+   .node-meta) si restringeva sul proprio contenuto invece di allargarsi -
+   le card DENTRO erano gia' tutte uguali tra loro (grid-template-columns:
+   1fr, verificato), ma il contenitore che le racchiude restava stretto
+   indipendentemente - vedi conversazione ("deve essere largo quanto
+   calibrazione lux"). Da chiuso non cambia nulla in pratica: c'e' solo il
+   summary (dimensionato al suo contenuto, .node-settings non ha
+   bordo/sfondo propri) quindi lo spazio in piu' assegnato resta invisibile
+   e #idx/indirizzo/pill continuano a stare sulla stessa riga (margin-left:
+   auto su quel gruppo, non su questo). */
+.node-settings{flex:1 1 auto;margin:0;padding:0;border:none;background:transparent}
 .node-settings[open]{padding-bottom:0}
 .node-settings summary{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.78rem;font-weight:600;line-height:1}
 .node-settings summary:hover{border-color:var(--accent-text);color:var(--accent-text)}
