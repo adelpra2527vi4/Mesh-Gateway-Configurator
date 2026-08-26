@@ -325,8 +325,12 @@ function showUpdatePopup(reg) {
 
   function requestVersion() {
     return new Promise((resolve) => {
-      if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-        resolve(null);
+      if (!('serviceWorker' in navigator)) {
+        resolve('Service worker non supportato da questo browser.');
+        return;
+      }
+      if (!navigator.serviceWorker.controller) {
+        resolve('Nessun service worker attivo ancora - ricarica la pagina.');
         return;
       }
       const onMsg = (event) => {
@@ -337,12 +341,15 @@ function showUpdatePopup(reg) {
       };
       navigator.serviceWorker.addEventListener('message', onMsg);
       navigator.serviceWorker.controller.postMessage('GET_VERSION');
-      // Rete di sicurezza: se la risposta non arriva mai (SW senza il
-      // gestore GET_VERSION, versione ancora piu' vecchia) non restare in
-      // attesa per sempre.
+      // Rete di sicurezza: se la risposta non arriva mai il service worker
+      // attivo e' ancora una versione PRECEDENTE a questa funzione (non
+      // conosce "GET_VERSION", lo ignora silenziosamente) - messaggio
+      // esplicito invece del generico "non disponibile", cosi' si capisce
+      // che serve un refresh forzato una tantum (stesso discorso del
+      // popup "Aggiorna") - vedi conversazione.
       setTimeout(() => {
         navigator.serviceWorker.removeEventListener('message', onMsg);
-        resolve(null);
+        resolve('Service worker non ancora aggiornato - forza un refresh (Ctrl+Shift+R).');
       }, 1500);
     });
   }
@@ -366,7 +373,7 @@ function showUpdatePopup(reg) {
     // stesso pointerdown/long-press che ha appena APERTO il popup lo
     // richiuderebbe all'istante (bubbling sullo stesso evento).
     setTimeout(() => document.addEventListener('pointerdown', onOutside, true), 0);
-    setTimeout(close, 4000);
+    setTimeout(close, 6000);
   }
 
   title.addEventListener('pointerdown', () => {
