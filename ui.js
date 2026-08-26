@@ -298,34 +298,8 @@ let prevHex = {};     // key mac|TYPE|id -> ultimo hex visto, per il confronto
 // della lista - vedi conversazione ("migliora il pannello sniffing").
 let seenSniffMacs = new Set();
 
-// Header "congelato" (topbar+tabbar+stats mesh, vedi style.css): gli offset
-// --topbar-h/--tabbar-h usati per impilare gli sticky vanno misurati a
-// runtime (l'altezza reale dipende da font/zoom/tema, un valore fisso in
-// CSS si disallineerebbe) - richiamata al resize e ogni volta che il
-// contenuto sopra puo' essere cambiato di dimensione (connessione, cambio
-// tab, refresh dei dati) - vedi conversazione ("questo blocchetto possiamo
-// renderlo fisso?").
-function syncStickyOffsets() {
-  const topbar = document.querySelector('.topbar');
-  const tabbar = document.querySelector('.tabbar');
-  if (!topbar) return;
-  const topbarH = topbar.offsetHeight + parseFloat(getComputedStyle(topbar).marginBottom || 0);
-  document.documentElement.style.setProperty('--topbar-h', topbarH + 'px');
-  if (tabbar) {
-    const tabbarH = tabbar.offsetHeight + parseFloat(getComputedStyle(tabbar).marginBottom || 0);
-    document.documentElement.style.setProperty('--tabbar-h', tabbarH + 'px');
-  }
-}
-
 export function init(a) {
   api = a;
-
-  window.addEventListener('resize', syncStickyOffsets);
-  // Il primo giro va rimandato di un frame: al momento di init() il tabbar
-  // e' ancora dentro #main-content con display:none (non connesso), quindi
-  // offsetHeight leggerebbe 0 - richiamata di nuovo in setConnected() non
-  // appena il layout vero diventa visibile.
-  requestAnimationFrame(syncStickyOffsets);
 
   document.getElementById('btn-meshsave').addEventListener('click', () => {
     const m = document.getElementById('savemsg'); if (m) m.textContent = '...';
@@ -385,10 +359,9 @@ export function showTab(name) {
   document.getElementById('tb-mesh').classList.toggle('active', name === 'mesh');
   document.getElementById('tb-beacon').classList.toggle('active', name === 'beacon');
   document.getElementById('tb-device').classList.toggle('active', name === 'device');
-  // Solo il tab Mesh ha le .stats sticky sotto la tabbar - un cambio tab non
-  // altera l'altezza di topbar/tabbar in se', ma ricalcolare qui e' innocuo
-  // e copre eventuali a-capo diversi del testo dei pulsanti tab.
-  requestAnimationFrame(syncStickyOffsets);
+  // Le stats (nella sticky-header, vedi index.html) esistono solo per il tab
+  // Mesh - negli altri tab restano nascoste anche a connessione avvenuta.
+  document.getElementById('mesh-stats').classList.toggle('hidden', name !== 'mesh');
 }
 
 export function setConnected(connected) {
@@ -418,10 +391,11 @@ export function setConnected(connected) {
   dot.classList.toggle('on', connected);
   if (!connected) dot.classList.remove('usbmode');
   document.getElementById('main-content').style.display = connected ? '' : 'none';
-  // La tabbar era a display:none finche' non connessi (offsetHeight=0):
-  // solo ora che #main-content torna visibile la sua altezza vera e'
-  // misurabile - vedi syncStickyOffsets sopra.
-  if (connected) requestAnimationFrame(syncStickyOffsets);
+  // Contenuto extra della sticky-header (tabbar/banner/stats mesh, vedi
+  // index.html): stesso interruttore connesso/disconnesso di #main-content,
+  // ma e' un elemento a se' (fuori da #main-content, dentro .sticky-header)
+  // quindi va acceso/spento separatamente.
+  document.getElementById('header-extra').style.display = connected ? '' : 'none';
   if (!connected) {
     lastState = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
     lastStatus = { relays: [], blesensors: [] };

@@ -2,7 +2,7 @@
 // (niente auto-discovery, vedi spec). Web Serial funziona offline (e' una
 // API browser, non richiede rete) quindi l'app e' usabile anche senza
 // connessione dopo il primo caricamento.
-const CACHE_NAME = 'mesh-gateway-pwa-v89';
+const CACHE_NAME = 'mesh-gateway-pwa-v90';
 const ASSETS = [
   './',
   'index.html',
@@ -28,8 +28,14 @@ self.addEventListener('install', (event) => {
 
 // Il popup "Aggiorna disponibile" (index.html) manda questo messaggio al
 // click dell'utente: solo allora il SW in attesa prende il controllo.
+// GET_VERSION invece risponde con CACHE_NAME (unica fonte di verita' della
+// versione, niente numero duplicato a mano in index.html) - usato dal
+// popup versione al long-press sul titolo, vedi conversazione.
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  else if (event.data === 'GET_VERSION' && event.source) {
+    event.source.postMessage({ type: 'VERSION', version: CACHE_NAME });
+  }
 });
 
 self.addEventListener('activate', (event) => {

@@ -16,8 +16,9 @@
   Questo configuratore richiede Chrome o Edge. Firefox e Safari non supportano Web Serial ne' Web Bluetooth.
 </div>
 
+<div class="sticky-header">
 <div class="topbar">
-  <div class="brand"><span class="dot" id="conn-dot"></span><h1>Terminal Controller</h1></div>
+  <div class="brand"><span class="dot" id="conn-dot"></span><h1 id="app-title">Terminal Controller</h1></div>
   <span id="badge-busy" class="badge warn" style="display:none">Config...</span>
   <span id="badge-oob" class="badge good" style="display:none">OOB &#9989;</span>
   <button id="btn-refresh" class="iconbtn" title="Aggiorna"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>
@@ -59,7 +60,14 @@
   </div>
 </div>
 
-<div id="main-content" style="display:none">
+<!-- Contenuto extra della sticky-header (tabbar/banner/stats mesh): un unico
+     blocco display:none finche' non connessi, invece delle singole classi
+     "connected-only" sui figli - cosi' banner/reset-countdown continuano a
+     gestire il proprio display:block/none via ui.js senza che uno stile
+     inline lasciato da una sessione precedente possa scavalcare il
+     nascondimento del genitore - vedi conversazione ("manca il fondo",
+     bug delle sticky separate con margini trasparenti tra loro). -->
+<div id="header-extra" style="display:none">
   <div class="tabbar">
     <button type="button" class="tabbtn active" id="tb-device">Dispositivo</button>
     <button type="button" class="tabbtn" id="tb-mesh">Mesh</button>
@@ -69,13 +77,17 @@
   <div id="reset-countdown"></div>
   <div id="banner"></div>
 
+  <div id="mesh-stats" class="stats hidden">
+    <div class="stat"><div class="num" id="st-lamps">&ndash;</div><div class="lbl">Lampade</div></div>
+    <div class="stat"><div class="num" id="st-sens">&ndash;</div><div class="lbl">Sensori</div></div>
+    <div class="stat" id="st-busy-box"><div class="num" id="st-busy">&ndash;</div><div class="lbl">Stato</div></div>
+  </div>
+</div>
+</div>
+
+<div id="main-content" style="display:none">
   <!-- ===================== TAB MESH ===================== -->
   <div id="tab-mesh" class="tabpanel hidden">
-    <div class="stats">
-      <div class="stat"><div class="num" id="st-lamps">&ndash;</div><div class="lbl">Lampade</div></div>
-      <div class="stat"><div class="num" id="st-sens">&ndash;</div><div class="lbl">Sensori</div></div>
-      <div class="stat" id="st-busy-box"><div class="num" id="st-busy">&ndash;</div><div class="lbl">Stato</div></div>
-    </div>
     <div class="bar">
       <button id="btn-meshsave" class="btn primary">Salva configurazione mesh</button>
       <span id="savemsg"></span>
@@ -301,6 +313,72 @@ function showUpdatePopup(reg) {
     setTimeout(() => box.remove(), 500);
   });
 }
+
+// Popup versione PWA al long-press sul titolo - la versione mostrata e'
+// letta dal service worker attivo (GET_VERSION, risponde con CACHE_NAME),
+// cosi' resta un'unica fonte di verita' invece di un numero duplicato a
+// mano qui - vedi conversazione ("mini popup con la versione della pwa").
+(function () {
+  const title = document.getElementById('app-title');
+  if (!title) return;
+  let pressTimer = null;
+
+  function requestVersion() {
+    return new Promise((resolve) => {
+      if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+        resolve(null);
+        return;
+      }
+      const onMsg = (event) => {
+        if (event.data && event.data.type === 'VERSION') {
+          navigator.serviceWorker.removeEventListener('message', onMsg);
+          resolve(event.data.version);
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', onMsg);
+      navigator.serviceWorker.controller.postMessage('GET_VERSION');
+      // Rete di sicurezza: se la risposta non arriva mai (SW senza il
+      // gestore GET_VERSION, versione ancora piu' vecchia) non restare in
+      // attesa per sempre.
+      setTimeout(() => {
+        navigator.serviceWorker.removeEventListener('message', onMsg);
+        resolve(null);
+      }, 1500);
+    });
+  }
+
+  function showVersionPopup() {
+    if (document.getElementById('version-popup')) return;
+    const box = document.createElement('div');
+    box.id = 'version-popup';
+    box.textContent = 'Verifica versione...';
+    document.body.appendChild(box);
+    requestVersion().then((v) => {
+      if (!document.body.contains(box)) return; // gia' chiuso nel frattempo
+      box.textContent = v || 'Versione non disponibile';
+    });
+    const close = () => {
+      box.remove();
+      document.removeEventListener('pointerdown', onOutside, true);
+    };
+    const onOutside = (e) => { if (!box.contains(e.target)) close(); };
+    // Il listener va agganciato al giro di eventi successivo, altrimenti lo
+    // stesso pointerdown/long-press che ha appena APERTO il popup lo
+    // richiuderebbe all'istante (bubbling sullo stesso evento).
+    setTimeout(() => document.addEventListener('pointerdown', onOutside, true), 0);
+    setTimeout(close, 4000);
+  }
+
+  title.addEventListener('pointerdown', () => {
+    pressTimer = setTimeout(showVersionPopup, 550);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) =>
+    title.addEventListener(ev, () => clearTimeout(pressTimer))
+  );
+  // Niente menu contestuale (comportamento nativo del browser per una
+  // pressione prolungata su testo, su mobile soprattutto).
+  title.addEventListener('contextmenu', (e) => e.preventDefault());
+})();
 </script>
 </body>
 </html>

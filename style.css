@@ -32,14 +32,24 @@ h3{font-size:1.05em;margin:22px 0 10px}h4{font-size:.95em;margin:16px 0 6px}
 code{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 5px;font-family:ui-monospace,Menlo,monospace;font-size:.86em}
 
 /* Header "congelato" (topbar + tabbar + stats mesh) mentre si scorre la
-   pagina, come le righe bloccate di Excel: ogni pezzo e' sticky al proprio
-   top, impilati uno sotto l'altro senza sovrapporsi - vedi conversazione
-   ("questo blocchetto possiamo renderlo fisso?"). Gli offset --topbar-h/
-   --tabbar-h sono misurati a runtime in ui.js (syncStickyOffsets), non
-   hardcoded: l'altezza reale dipende da font/zoom/tema e cambierebbe a
-   ogni ritocco di questo file, un valore fisso si sarebbe disallineato. */
-.topbar{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:10px;padding:14px 0 12px;margin-bottom:8px;background:var(--bg);flex-wrap:wrap}
+   pagina, come le righe bloccate di Excel - vedi conversazione ("questo
+   blocchetto possiamo renderlo fisso?"). UN SOLO blocco sticky per l'intero
+   gruppo (non tre sticky separati impilati via offset): il primo tentativo
+   aveva margini trasparenti tra i tre elementi sticky, che lasciavano
+   intravedere il contenuto sotto durante lo scroll ("manca il fondo") -
+   con un unico contenitore sticky, tutto lo spazio tra topbar/tabbar/stats
+   e' comunque dentro il suo sfondo pieno, niente piu' buchi. */
+.sticky-header{position:sticky;top:0;z-index:6;background:var(--bg)}
+.topbar{display:flex;align-items:center;gap:10px;padding:14px 0 12px;margin-bottom:8px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:180px}
+/* Titolo: long-press mostra il popup versione (vedi index.html) - niente
+   selezione testo/menu contestuale durante la pressione, sarebbe scattato
+   al posto del popup su mobile - vedi conversazione. */
+#app-title{user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:default}
+/* Mini popup versione: stesso linguaggio del popup di aggiornamento (fixed,
+   card scura, pop-in) ma piu' piccolo e ancorato in alto a sinistra sotto
+   al titolo invece che in basso al centro. */
+#version-popup{position:fixed;top:64px;left:16px;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:.82rem;font-weight:600;font-family:ui-monospace,Menlo,monospace;color:var(--accent-text);box-shadow:0 8px 24px rgba(0,0,0,.35);animation:popIn .18s cubic-bezier(.16,.84,.36,1)}
 /* Pulsazione a "onda", sempre attiva a prescindere dallo stato - vedi
    conversazione. Prima usava box-shadow con color-mix() ricalcolato ad ogni
    frame: su Chrome ogni tanto si "inchiodava" a meta' animazione (bug noto
@@ -158,12 +168,13 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
    un gruppetto compatto in mezzo a tanto spazio vuoto - vedi conversazione
    ("belle ampie, ad espandersi del tutto la larghezza"). Sotto i 480px
    passano a due righe (flex-wrap) restando comunque a piena larghezza. */
-.tabbar{position:sticky;top:var(--topbar-h,60px);z-index:5;display:flex;gap:10px;margin:10px 0 26px;background:var(--bg);padding-top:2px}
+.tabbar{display:flex;gap:10px;margin:10px 0 26px}
 .tabbtn{flex:1;text-align:center;padding:14px 20px;border-radius:12px;font-size:1.05rem;font-weight:700;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;text-decoration:none;font-family:inherit;display:inline-block}
 @media (max-width:480px){.tabbar{flex-wrap:wrap}.tabbtn{flex:1 1 40%}}
 .tabbtn:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .tabbtn.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .tabpanel.hidden{display:none}
+.hidden{display:none}
 
 /* ── Transizioni GDS: comparsa leggera di viste/pannelli/pill che appaiono
    una tantum (fadeInUp/popIn) e "scatto" su un valore numerico live che
@@ -182,7 +193,7 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
    riga invece di un gruppetto compatto - vedi conversazione ("belle ampie,
    ad espandersi del tutto la larghezza in 16:9"). Sotto i 480px impilate a
    piena larghezza (una per riga, troppo strette altrimenti in tre). */
-.stats{position:sticky;top:calc(var(--topbar-h,60px) + var(--tabbar-h,64px));z-index:4;display:flex;gap:14px;margin:0 0 20px;background:var(--bg);padding-top:2px}
+.stats{display:flex;gap:14px;margin:0 0 20px}
 .stat{flex:1;border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:16px 22px;box-shadow:var(--shadow);text-align:center}
 .stat .num{font-size:2rem;font-weight:700;line-height:1.15}
 .stat .lbl{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:2px}
