@@ -362,7 +362,13 @@ function showUpdatePopup(reg) {
     document.body.appendChild(box);
     requestVersion().then((v) => {
       if (!document.body.contains(box)) return; // gia' chiuso nel frattempo
-      box.textContent = v || 'Versione non disponibile';
+      // CACHE_NAME e' "mesh-gateway-pwa-vNN" (vedi sw.js): in visualizzazione
+      // basta il suffisso "vNN", il resto e' sempre lo stesso prefisso fisso
+      // e non aggiunge informazione - vedi conversazione ("riduciamolo a
+      // v91, in visualizzazione"). Messaggi di errore (non un CACHE_NAME)
+      // restano invariati, il regex semplicemente non combacia con quelli.
+      const short = typeof v === 'string' ? v.match(/(v\d+)$/) : null;
+      box.textContent = (short ? short[1] : v) || 'Versione non disponibile';
     });
     const close = () => {
       box.remove();
