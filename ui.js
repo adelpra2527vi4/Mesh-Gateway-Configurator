@@ -764,10 +764,38 @@ function renderNode(nd) {
     ? (nd.grp ? `<span class="badge good">Gruppo OK</span>` : `<span class="badge warn">non rebindato</span>`)
     : '';
   const rbtn = hasLampKind ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
+  // Companion switch: calcolato qui (non piu' in fondo dentro lampBlock)
+  // cosi' puo' finire nel pannello Impostazioni insieme a spunte/Rebind -
+  // vedi conversazione ("snellire la card, dentro un pulsante settings").
+  // Stessa guardia hasLampKind di prima: un nodo solo-sensore non ha
+  // companion switch (e' un'estensione del lato lampada del device).
+  let companion = '';
+  if (hasLampKind) {
+    const qrBtn = `<button type="button" class="iconbtn qr-scan-btn" data-act="qrscan" data-node="${nd.i}" title="Scansiona QR con la fotocamera"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button>`;
+    const pairBox = nd.paired
+      ? `<div style="margin:8px 0"><span class="badge good">Abbinato</span></div>
+         <button class="btn danger sm" data-act="unpair" data-node="${nd.i}">Scollega companion</button> <span class="muted" id="pm_${nd.i}"></span>`
+      : `<div class="qr-row">
+           <input type="text" id="pq_${nd.i}" placeholder="Contenuto QR interruttore..." style="flex:1;margin:8px 0">
+           ${qrBtn}
+         </div>
+         <button class="btn sm" data-act="pair" data-node="${nd.i}">Abbina</button> <span class="muted" id="pm_${nd.i}"></span>`;
+    companion = `<div class="card"><div class="elem-title">Companion switch</div>${pairBox}</div>`;
+  }
+  const gearIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
+  // Pannello "Impostazioni" richiudibile: spunte Lampada/Sensore, Rebind/
+  // badge gruppo, Companion switch - tutta roba di configurazione
+  // occasionale, non i controlli operativi (accendi/spegni/livello) che
+  // restano sempre visibili sotto - vedi conversazione ("snellire un po'").
+  // Chiuso di default come gli altri pannelli <details> dell'app.
+  const settingsBody = kindPicker
+    + (rbtn || grpBadge ? `<div>${rbtn} ${grpBadge}</div>` : '')
+    + companion;
+  const settingsPanel = `<details class="node-settings"><summary>${gearIcon}Impostazioni</summary><div class="node-settings-body">${settingsBody}</div></details>`;
 
   let head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${fbtn}</div>`
-    + `<div class="node-meta">${kindPicker} <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`
-    + (rbtn || grpBadge ? `<div class="node-meta" style="margin-top:-2px">${rbtn} ${grpBadge}</div>` : '');
+    + `<div class="node-meta"><span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`
+    + settingsPanel;
 
   if (!nd.cfg) return head + `<div class="empty" style="margin-top:10px">Non ancora configurato.</div></div>`;
 
@@ -863,26 +891,13 @@ function renderNode(nd) {
              id="lvl_${nd.i}_${lv.li}" data-act="level-input" data-node="${nd.i}" data-li="${lv.li}"></div>`;
   }
   cards += `</div>`;
-
-  // Il pulsante e' sempre visibile (invece di sparire in silenzio se manca
-  // il supporto): se BarcodeDetector/fotocamera non sono disponibili lo
-  // scanner lo dice esplicitamente nel modal, il campo testo resta comunque
-  // sempre utilizzabile come richiesto.
-  const qrBtn = `<button type="button" class="iconbtn qr-scan-btn" data-act="qrscan" data-node="${nd.i}" title="Scansiona QR con la fotocamera"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg></button>`;
-  const pairBox = nd.paired
-    ? `<div style="margin:8px 0"><span class="badge good">Abbinato</span></div>
-       <button class="btn danger sm" data-act="unpair" data-node="${nd.i}">Scollega companion</button> <span class="muted" id="pm_${nd.i}"></span>`
-    : `<div class="qr-row">
-         <input type="text" id="pq_${nd.i}" placeholder="Contenuto QR interruttore..." style="flex:1;margin:8px 0">
-         ${qrBtn}
-       </div>
-       <button class="btn sm" data-act="pair" data-node="${nd.i}">Abbina</button> <span class="muted" id="pm_${nd.i}"></span>`;
-  const companion = `<div class="card" style="margin-top:10px"><div class="elem-title">Companion switch</div>${pairBox}</div>`;
-  lampBlock = cards + companion;
+  lampBlock = cards;
 
   // Un nodo combo mostra prima le card sensore (presenza/lux/calibrazione)
-  // e poi quelle lampada (elementi on/off, livelli, companion switch), una
-  // sotto l'altra invece che scartare l'una o l'altra come prima.
+  // e poi quelle lampada (elementi on/off, livelli), una sotto l'altra
+  // invece che scartare l'una o l'altra come prima. Companion switch e'
+  // ormai dentro il pannello Impostazioni (settingsPanel, gia' incluso in
+  // head) insieme a spunte/Rebind.
   return head + sensorBlock + lampBlock + `</div>`;
 }
 

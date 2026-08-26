@@ -490,6 +490,21 @@ summary{cursor:pointer;font-weight:600;padding:11px 0;font-size:.92em;list-style
 summary::-webkit-details-marker{display:none}
 summary::before{content:'\25B8 ';color:var(--accent-text)}
 details[open] summary::before{content:'\25BE '}
+/* Pannello "Impostazioni" per card nodo mesh (spunte Lampada/Sensore,
+   Rebind, Companion switch): un <details> come gli altri pannelli
+   dell'app, ma il summary e' stilizzato come un vero pulsante (ingranaggio
+   + testo, stessa geometria di .btn.sm) invece del link con triangolo
+   usato per "Log seriale"/"Sniffer BLE" - l'utente lo ha chiesto
+   esplicitamente come "pulsante settings" - vedi conversazione ("snellire
+   un po'"). */
+.node-settings{margin:10px 0 0;padding:0;border:none;background:transparent}
+.node-settings[open]{padding-bottom:0}
+.node-settings summary{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.78rem;font-weight:600;line-height:1}
+.node-settings summary:hover{border-color:var(--accent-text);color:var(--accent-text)}
+.node-settings summary::before{content:none}
+.node-settings[open] summary{margin-bottom:10px;border-color:var(--accent-text);color:var(--accent-text)}
+.node-settings-body{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--border);background:var(--surface2);border-radius:12px}
+.node-settings-body .kind-picker{flex-wrap:wrap}
 .savebar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:16px 0 6px;margin-top:18px}
 /* Slot sensori a sinistra, guida sempre visibile a destra (fianco a fianco):
    ha senso solo su schermo largo/PC, ma l'app richiede comunque USB (Web
