@@ -235,8 +235,14 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
    conversazione ("devono restare al fianco di settings"). */
 .node-meta{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
 .addr{color:var(--muted);font-size:.8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:10px}
-.card{border:1px solid var(--border);background:var(--surface2);border-radius:12px;padding:12px}
+/* flex (era grid auto-fill): con la griglia, una riga finale con meno card
+   del massimo per riga (es. 2 su una capacita' di 3) lasciava le celle
+   avanzate vuote invece di farle allargare - vedi conversazione ("anche
+   solo lampada deve avere le card... espanse fino in fondo"). Con flex-wrap
+   + flex:1 sulle card (sotto), qualunque riga - piena o no - si spartisce
+   sempre tutta la larghezza disponibile. */
+.cards{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.card{flex:1 1 220px;border:1px solid var(--border);background:var(--surface2);border-radius:12px;padding:12px}
 .card .elem-title{font-weight:600;font-size:.92rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .card .addr{display:block;margin:2px 0 9px}
 .row-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -508,14 +514,17 @@ details[open] summary::before{content:'\25BE '}
 .node-settings summary:hover{border-color:var(--accent-text);color:var(--accent-text)}
 .node-settings summary::before{content:none}
 .node-settings[open] summary{margin-bottom:10px;border-color:var(--accent-text);color:var(--accent-text)}
-/* .node-settings-body porta anche la classe .cards (contenitore esterno:
-   bordo/sfondo/padding), ma qui una colonna sola invece dell'auto-fill a
-   piu' colonne di .cards - ogni card si allarga il piu' possibile invece
-   di restare stretta accanto alle altre - vedi conversazione ("una per
-   riga, cosi' sono espanse il massimo possibile"). */
+/* .node-settings-body porta anche la classe .cards (ora flex, vedi sopra):
+   qui pero' colonna singola (flex-direction:column) invece di affiancare
+   le card come fa .cards di default - ogni card occupa una riga intera,
+   espansa il piu' possibile - vedi conversazione ("una per riga, cosi'
+   sono espanse il massimo possibile"). */
 .node-settings-body{padding:12px;border:1px solid var(--border);background:var(--surface2);border-radius:12px}
-.node-settings-body.cards{margin-top:0;grid-template-columns:1fr}
-.node-settings-body .card{background:var(--surface)}
+.node-settings-body.cards{flex-direction:column;margin-top:0}
+/* flex:0 1 auto (era 1 1 220px ereditato da .card): in colonna quel 220px
+   di flex-basis si applicherebbe all'asse verticale (altezza minima
+   inutile), non a quello orizzontale come nella griglia di card affiancate. */
+.node-settings-body .card{flex:0 1 auto;background:var(--surface)}
 .node-settings-body .kind-picker{flex-wrap:wrap}
 .savebar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:16px 0 6px;margin-top:18px}
 /* Slot sensori a sinistra, guida sempre visibile a destra (fianco a fianco):
