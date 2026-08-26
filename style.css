@@ -202,7 +202,12 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
   .stats{flex-direction:column;gap:10px}
 }
 .bar{display:flex;align-items:center;gap:12px;margin:0 0 18px;flex-wrap:wrap}
-#banner{display:none;border:1px solid var(--red);background:color-mix(in srgb,var(--red) 12%,var(--surface));color:var(--red);padding:9px 13px;border-radius:11px;font-weight:600;font-size:.9rem;margin:0 0 14px}
+/* Spostato dentro la topbar, tra il titolo e i pulsanti (era un blocco a
+   piena larghezza sopra le stats) - vedi conversazione ("spostala tra
+   terminal controller e refresh"). flex:1 lo fa allargare per riempire lo
+   spazio tra titolo e icone senza spingerle fuori dalla riga quando il
+   testo e' corto/assente (display:none di default). */
+#banner{display:none;flex:1;min-width:160px;border:1px solid var(--red);background:color-mix(in srgb,var(--red) 12%,var(--surface));color:var(--red);padding:7px 13px;border-radius:11px;font-weight:600;font-size:.82rem;margin:0}
 #savemsg{font-size:.85rem;color:var(--muted)}
 
 .node{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:14px;margin:0 0 14px;box-shadow:var(--shadow)}
