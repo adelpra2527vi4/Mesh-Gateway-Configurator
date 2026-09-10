@@ -6,6 +6,16 @@
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
 let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
 
+// Un gruppo mesh non ha un "livello" reale da leggere indietro (e' solo
+// un indirizzo a cui sono sottoscritti piu' nodi, ognuno col proprio stato) -
+// lo slider di gruppo era percio' sempre ridisegnato fisso al 100%, quindi
+// ogni valore impostato dall'utente spariva al giro di poll successivo
+// (~2s), dando l'impressione che "la barretta non si aggiorna". Si tiene
+// qui solo l'ultimo valore impostato localmente per gruppo, cosi' il
+// re-render periodico mostra quello invece di resettare sempre a 100 - vedi
+// conversazione ("devo fare piu' di un click e la barretta non si aggiorna").
+const groupLevelLocal = {};
+
 // Scanner QR companion: decodifica via jsQR (vendor/jsQR.min.js, libreria
 // locale nel progetto, MIT). jsQR lavora
 // su un frame video catturato in canvas e funziona in qualsiasi browser
@@ -822,19 +832,32 @@ function renderGroups() {
   // Stessa protezione anti-refresh dello slider di livello per nodo
   // (renderNodes/id "lvl_"): senza, il poll periodico di CFG:STATE (~2s)
   // ricostruirebbe lo slider sotto al dito/mouse durante il trascinamento.
+  // Estesa anche ai due bottoni Accendi/Spegni (niente id, solo data-act):
+  // un click e' un mousedown+mouseup ravvicinati ma non istantanei, e il
+  // poll (che gira ogni ~2s a prescindere dal click) puo' capitare esattamente
+  // in mezzo, sostituendo il bottone sotto al dito e perdendo il click prima
+  // che arrivi a buon fine - serviva piu' di un tentativo. Vedi conversazione
+  // ("provato a accendere spegnere da pulsanti di gruppo... devo fare piu' di
+  // un click").
   const act = document.activeElement;
-  if (act && act.id && act.id.startsWith('grplvl_') && box.contains(act)) return;
+  if (act && box.contains(act)) {
+    if (act.id && act.id.startsWith('grplvl_')) return;
+    if (act.dataset && act.dataset.act === 'grpcmd') return;
+  }
 
-  box.innerHTML = `<div class="cards${lastState.busy ? ' usb-locked' : ''}">` + groups.map(g => `
+  box.innerHTML = `<div class="cards${lastState.busy ? ' usb-locked' : ''}">` + groups.map(g => {
+    const lvl = groupLevelLocal[g.addr] != null ? groupLevelLocal[g.addr] : 100;
+    return `
     <div class="card">
       <div class="elem-title">${g.name || g.addr}<span class="addr">${g.addr}</span></div>
       <div class="row-btns">
         <button class="btn primary sm" data-act="grpcmd" data-addr="${g.addr}" data-val="1">Accendi tutti</button>
         <button class="btn sm" data-act="grpcmd" data-addr="${g.addr}" data-val="0">Spegni tutti</button>
       </div>
-      <input type="range" min="0" max="100" value="100" class="slider" style="--p:100;margin-top:8px"
+      <input type="range" min="0" max="100" value="${lvl}" class="slider" style="--p:${lvl};margin-top:8px"
              id="grplvl_${g.addr}" data-act="grplevel" data-addr="${g.addr}">
-    </div>`).join('') + `</div>`;
+    </div>`;
+  }).join('') + `</div>`;
 
   box.querySelectorAll('[data-act="grpcmd"]').forEach(el => {
     el.addEventListener('click', () => {
@@ -844,6 +867,7 @@ function renderGroups() {
   box.querySelectorAll('[data-act="grplevel"]').forEach(el => {
     el.addEventListener('input', () => el.style.setProperty('--p', el.value));
     el.addEventListener('change', () => {
+      groupLevelLocal[el.dataset.addr] = el.value;
       api.sendCmd(`CFG:GRPLEVEL;addr=${el.dataset.addr};val=${el.value}`);
     });
   });
