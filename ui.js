@@ -953,7 +953,18 @@ function renderNodes() {
   // che si sta scrivendo).
   const act = document.activeElement;
   let editingId = null, editingVal = null, editingSel = null;
-  if (act && act.id && box.contains(act)) {
+  if (act && box.contains(act)) {
+    // Riepilogo "Impostazioni" (<summary>, niente id) appena cliccato per
+    // aprire/chiudere: un re-render puo' capitare esattamente tra mousedown
+    // e mouseup (il poll gira ogni ~2s indipendentemente dal click) e
+    // sostituendo il <details> sotto al dito il "click" non arriva mai a
+    // buon fine sull'elemento nuovo, quindi il pannello non si apre/chiude
+    // - serviva anche piu' di un tentativo per riuscire a chiuderlo, vedi
+    // conversazione ("il menu impostazioni fatica a chiudersi"). openState
+    // e' comunque gia' tracciato a parte in openSettingsNodes/isOpen, quindi
+    // saltare il render qui non perde nessuno stato.
+    if (act.tagName === 'SUMMARY' && act.closest('.node-settings')) return;
+    if (!act.id) return;
     // Checkbox Lampada/Sensore in corso di click: un re-render qui
     // ricostruisce il DOM sotto al dito/mouse esattamente mentre il
     // browser sta processando il toggle - stessa protezione che aveva il
@@ -1092,7 +1103,7 @@ function renderNode(nd) {
     // scartava sempre uno dei due set di dati gia' presenti in nd - vedi
     // conversazione: "esistono dispositivi che possono avere PIR e Led
     // assieme").
-    if (hasSensorKind) {
+    if (hasSensorKind || hasLampKind) {
       const s = nd.sensor;
       // Ogni card e' mostrata solo se il device ha risposto almeno una
       // volta a QUELLA specifica proprietà (pres/light/power/energyWh sono
@@ -1101,7 +1112,11 @@ function renderNode(nd) {
       // "—" per sempre su proprietà che il device non ha affatto (es.
       // Presenza/Luce su un driver con solo potenza, o Potenza/Energia su
       // un sensore PIR/lux puro). Vedi conversazione.
-      const presCard = (s && s.pres != null)
+      // Presenza/Luce solo per il lato "sensore" (PIR/lux) - Potenza/Energia
+      // solo per il lato "lampada" (i driver LED misurano il proprio consumo,
+      // non hanno PIR/lux) - vedi conversazione ("lampade: non hanno pir e
+      // lux - sensori: non hanno potenza/energia - misti hanno tutto").
+      const presCard = (hasSensorKind && s && s.pres != null)
         ? `<div class="card"><div class="elem-title">Presenza <span class="pill ${s.pres>0?'on':'off'}">${s.pres?'Presenza':'Assente'}</span></div></div>`
         : '';
 
@@ -1115,14 +1130,14 @@ function renderNode(nd) {
       const lastLux = lastNodeVals[nd.i]?.lux;
       const luxBump = lastLux !== undefined && lastLux !== luxStr ? ' animate-value-bump' : '';
       lastNodeVals[nd.i] = Object.assign(lastNodeVals[nd.i] || {}, { lux: luxStr });
-      const luxCard = (s && s.light != null)
+      const luxCard = (hasSensorKind && s && s.light != null)
         ? `<div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>`
         : '';
 
-      const powerCard = (s && s.power != null)
+      const powerCard = (hasLampKind && s && s.power != null)
         ? `<div class="card"><div class="elem-title">Potenza</div><div class="pctlbl" style="margin-top:6px">${s.power.toFixed(1)} W</div></div>`
         : '';
-      const energyCard = (s && s.energyWh != null)
+      const energyCard = (hasLampKind && s && s.energyWh != null)
         ? `<div class="card"><div class="elem-title">Energia</div><div class="pctlbl" style="margin-top:6px">${s.energyWh} Wh</div></div>`
         : '';
       const anySensorCard = presCard || luxCard || powerCard || energyCard;
