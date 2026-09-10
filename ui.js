@@ -375,6 +375,16 @@ async function importMeshFromFile(file) {
         const isRelevant = id === IMPORT_MODEL_ONOFF || id === IMPORT_MODEL_LEVEL
           || id === IMPORT_MODEL_SENSOR;
         if (!isRelevant) continue;
+        // "bind" vuoto significa che il modello NON ha mai ricevuto un
+        // Config Model App Bind sul dispositivo reale (visto nel file: uno
+        // stesso nodo puo' avere il modello OnOff Server su piu' elementi,
+        // ma solo alcuni bindati/sottoscritti - gli altri sono output
+        // inutilizzati/di scorta). Un comando verso un modello non bindato
+        // fallisce sempre sul device reale: includerlo comunque produceva
+        // offset "morti" nella lista, spesso proprio il primo (elemento 0),
+        // dando l'impressione che l'intero nodo non rispondesse mai. Vedi
+        // conversazione ("ancora nessun dato").
+        if (!Array.isArray(mod.bind) || !mod.bind.length) continue;
         if (id === IMPORT_MODEL_ONOFF && onoff.length < IMPORT_MAX_ELEM_OFFSETS) onoff.push(idx);
         else if (id === IMPORT_MODEL_LEVEL && level.length < IMPORT_MAX_ELEM_OFFSETS) level.push(idx);
         else if (id === IMPORT_MODEL_SENSOR && sensor.length < IMPORT_MAX_ELEM_OFFSETS) sensor.push(idx);
