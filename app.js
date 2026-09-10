@@ -6,6 +6,17 @@ const gw = new GatewaySerial();
 // Coda comandi: non manda il prossimo CFG: prima che il precedente abbia
 // avuto risposta (OK/ERR/BUSY) o sia scaduto un timeout di 8s.
 const CMD_TIMEOUT_MS = 8000;
+// CFG:IMPORTEND fa da sola tutto il lavoro pesante dell'import (bt_mesh_reset
+// + riprovisioning + configure_self, che dopo un boot/reset recente può
+// dover ritentare fino a 5 volte con 3s di pausa - vedi mesh_handler.c) e
+// gira per intero sul thread UART del firmware: 8s non bastano mai in quel
+// caso, il client marcava "timeout" mentre il firmware stava ancora
+// lavorando e finiva davvero con successo qualche secondo dopo - causando
+// poi un retry inutile che collideva con la risposta originale in arrivo
+// in ritardo (OK seguito subito da un ERR "nessun import in corso" per lo
+// stesso comando). Vedi conversazione.
+const CMD_TIMEOUT_OVERRIDES = { IMPORTEND: 45000 };
+function timeoutForCmd(name) { return CMD_TIMEOUT_OVERRIDES[name] || CMD_TIMEOUT_MS; }
 let cmdQueue = [];
 let cmdInFlight = null;
 let statePollTimer = null;
@@ -38,7 +49,7 @@ function pump() {
       if (resolve) resolve({ type: 'TIMEOUT', cmd: name, msg: '' });
       cmdInFlight = null;
       pump();
-    }, CMD_TIMEOUT_MS),
+    }, timeoutForCmd(name)),
   };
   gw.send(line);
 }

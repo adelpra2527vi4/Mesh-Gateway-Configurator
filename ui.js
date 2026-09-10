@@ -310,7 +310,20 @@ const IMPORT_MODEL_LEVEL = '1002';
 const IMPORT_MODEL_SENSOR = '1100';
 const IMPORT_MAX_ELEM_OFFSETS = 4; // NODE_META_MAX_ELEM lato firmware
 
+// CFG:IMPORTEND può metterci fino a decine di secondi (vedi timeout dedicato
+// in app.js) - senza questa guardia un secondo click sul pulsante mentre il
+// primo import sta ancora finalizzando (la UI sembra ferma, tentazione
+// comprensibile) accodava un secondo giro IMPORTNET/IMPORTNODE/IMPORTEND
+// completo, che il firmware processa comunque uno alla volta ma confondeva
+// il client con risposte in arrivo fuori ordine - vedi conversazione.
+let importInProgress = false;
+
 async function importMeshFromFile(file) {
+  if (importInProgress) {
+    alert('Un import è già in corso, attendi che finisca prima di riprovare.');
+    return;
+  }
+
   const msgEl = document.getElementById('importmsg');
   const setMsg = (t) => { if (msgEl) msgEl.textContent = t; };
 
@@ -336,6 +349,9 @@ async function importMeshFromFile(file) {
     + 'gateway (nodi, chiavi, configurazione). Continuare?')) {
     return;
   }
+
+  importInProgress = true;
+  try {
 
   // Indirizzo libero per il gateway stesso: calcolato QUI (non dal
   // firmware) su TUTTI i nodi del file, non solo quelli che importiamo -
@@ -459,6 +475,12 @@ async function importMeshFromFile(file) {
     if (!res.ok) failedGroups.push(name || g.address);
   }
 
+  // CFG:IMPORTEND fa tutto il lavoro pesante (riprovisioning + bind AppKey
+  // locale, che può ritentare più volte se il radio non si è ancora
+  // assestato subito dopo un boot/reset) - può metterci fino a decine di
+  // secondi, meglio dirlo esplicitamente invece di lasciare la UI apparente
+  // ferma. Vedi conversazione.
+  setMsg('Finalizzazione import in corso (può richiedere fino a 30-40s, attendere)...');
   const endRes = await sendImportLine('CFG:IMPORTEND');
   if (!endRes.ok) {
     setMsg(`Importazione fallita: ${endRes.msg}`);
@@ -472,6 +494,10 @@ async function importMeshFromFile(file) {
     setMsg(`Import completato: ${toImport.length} nodi, ${groups.length} gruppi.`);
   }
   api.afterCmdRefresh(500);
+
+  } finally {
+    importInProgress = false;
+  }
 }
 
 export function init(a) {
