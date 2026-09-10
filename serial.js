@@ -304,12 +304,20 @@ export class GatewaySerial extends EventTarget {
       }
       case 'SENSOR_DATA': {
         const node = st.nodes.find(x => x.i === parseInt(fields.node, 10));
-        // power_x10/energy_wh: -1 = sconosciuto (nessun Sensor Server di
-        // potenza sul device, o non ancora letto) - vedi mesh_handler.c.
+        // pres/light/power_x10/energy_wh: -1 = proprietà non supportata da
+        // questo device (scoperta via Sensor Descriptor Get, vedi
+        // discover_sensor_caps in mesh_handler.c) o non ancora letta -
+        // normalizzati tutti a null cosi' la UI puo' nascondere la card
+        // invece di mostrare un placeholder vuoto per sempre (vedi
+        // conversazione: "nascondiamo le card da cui non arriva nulla").
+        const pres = parseInt(fields.pres, 10);
+        const light = parseInt(fields.light, 10);
         const powerX10 = parseInt(fields.power_x10, 10);
         const energyWh = parseInt(fields.energy_wh, 10);
         if (node) node.sensor = {
-          pres: parseInt(fields.pres, 10), light: parseInt(fields.light, 10), hassens: fields.hassens === '1',
+          pres: Number.isFinite(pres) && pres >= 0 ? pres : null,
+          light: Number.isFinite(light) && light >= 0 ? light : null,
+          hassens: fields.hassens === '1',
           power: Number.isFinite(powerX10) && powerX10 >= 0 ? powerX10 / 10 : null,
           energyWh: Number.isFinite(energyWh) && energyWh >= 0 ? energyWh : null,
         };

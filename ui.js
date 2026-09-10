@@ -711,9 +711,16 @@ export function applyPush(detail) {
       if (lv) { lv.pct = detail.pct; renderMesh(); return; }
     } else if (detail.type === 'SENSOR') {
       if (node.base && node.base.toLowerCase() === addrHex && node.sensor) {
-        node.sensor.pres = detail.presence ? 1 : 0;
-        node.sensor.light = detail.lux >= 0 ? Math.round(detail.lux * 100) : -1;
-        if (detail.lux >= 0) luxRawLive[node.i] = detail.lux;  // per il wizard di calibrazione
+        // Ogni campo e' presente solo se il device supporta davvero quella
+        // proprieta' (il firmware ora omette presence/lux/w/wh interamente
+        // invece di mandare -1, vedi push_sensor in mesh_handler.c) - un
+        // campo assente lascia il valore precedente (che sara' null se mai
+        // arrivato, cosi' la card resta nascosta) invece di sovrascriverlo.
+        if (detail.presence !== undefined) node.sensor.pres = detail.presence ? 1 : 0;
+        if (detail.lux !== undefined) {
+          node.sensor.light = Math.round(detail.lux * 100);
+          luxRawLive[node.i] = detail.lux;  // per il wizard di calibrazione
+        }
         if (detail.power !== undefined) node.sensor.power = detail.power;
         if (detail.energyWh !== undefined) node.sensor.energyWh = detail.energyWh;
         renderMesh();
@@ -1061,44 +1068,58 @@ function renderNode(nd) {
     // assieme").
     if (hasSensorKind) {
       const s = nd.sensor;
-      const presOn = s && s.pres > 0;
-      const pres = !s || s.pres < 0 ? '&mdash;' : (s.pres ? 'Presenza' : 'Assente');
+      // Ogni card e' mostrata solo se il device ha risposto almeno una
+      // volta a QUELLA specifica proprietà (pres/light/power/energyWh sono
+      // null finché il Sensor Descriptor Get non conferma il supporto, vedi
+      // discover_sensor_caps in mesh_handler.c) - niente più card vuote
+      // "—" per sempre su proprietà che il device non ha affatto (es.
+      // Presenza/Luce su un driver con solo potenza, o Potenza/Energia su
+      // un sensore PIR/lux puro). Vedi conversazione.
+      const presCard = (s && s.pres != null)
+        ? `<div class="card"><div class="elem-title">Presenza <span class="pill ${s.pres>0?'on':'off'}">${s.pres?'Presenza':'Assente'}</span></div></div>`
+        : '';
+
       const curLux = luxRawLive[nd.i] !== undefined ? luxRawLive[nd.i]
-                     : (s && s.light >= 0 ? s.light / 100 : null);
-      const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
+                     : (s && s.light != null ? s.light / 100 : null);
       // "Scatto" (value-bump, style.css) sulla lettura lux solo quando il
       // valore mostrato cambia davvero rispetto all'ultimo giro - il nodo
       // viene comunque riscritto per intero ad ogni poll, quindi la classe
       // va decisa qui in fase di template invece che via classList più sotto.
+      const luxStr = curLux !== null ? curLux.toFixed(2) + ' lux' : '&mdash;';
       const lastLux = lastNodeVals[nd.i]?.lux;
       const luxBump = lastLux !== undefined && lastLux !== luxStr ? ' animate-value-bump' : '';
       lastNodeVals[nd.i] = Object.assign(lastNodeVals[nd.i] || {}, { lux: luxStr });
-      const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
+      const luxCard = (s && s.light != null)
+        ? `<div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>`
+        : '';
 
-      // Potenza/energia: solo se il device ha risposto almeno una volta a
-      // quella specifica proprietà (vedi power_x10/energy_wh in
-      // CFG:SENSOR_DATA, mesh_handler.c) - niente card "vuota" per i
-      // sensori presenza/lux che non la supportano affatto.
       const powerCard = (s && s.power != null)
         ? `<div class="card"><div class="elem-title">Potenza</div><div class="pctlbl" style="margin-top:6px">${s.power.toFixed(1)} W</div></div>`
         : '';
       const energyCard = (s && s.energyWh != null)
         ? `<div class="card"><div class="elem-title">Energia</div><div class="pctlbl" style="margin-top:6px">${s.energyWh} Wh</div></div>`
         : '';
+      const anySensorCard = presCard || luxCard || powerCard || energyCard;
+      const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>`
+        : (!anySensorCard ? `<div class="addr" style="margin-top:8px">(in attesa di dati dal sensore...)</div>` : '');
 
       // Il firmware applica un fattore moltiplicativo per nodo (sensor_light_cal
       // in main.c: calibrato = grezzo * fattore / 1000) - un offset additivo
       // provato prima lasciava il buio (grezzo=0) diverso da 0 dopo calibrazione,
       // sbagliato per definizione - vedi conversazione. Vedi CFG:SETLUXCALIB.
-      const calib = getNodeCalib(nd.i);
-      const calibSummary = calib && calib.factor_1000
-        ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)} (rif: ${calib.ref_lux||'?'} lux)`
-        : `<span class="badge warn">Non calibrato</span>`;
-      const usbLock = !lastState.usbMode ? ' usb-locked' : '';
-      // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
-      const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
+      // Calibrazione lux: ha senso solo se questo device conferma davvero
+      // il supporto lux (luxCard non vuota) - su un device solo
+      // potenza/energia la card resterebbe una funzione morta per sempre.
+      if (luxCard) {
+        const calib = getNodeCalib(nd.i);
+        const calibSummary = calib && calib.factor_1000
+          ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)} (rif: ${calib.ref_lux||'?'} lux)`
+          : `<span class="badge warn">Non calibrato</span>`;
+        const usbLock = !lastState.usbMode ? ' usb-locked' : '';
+        // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
+        const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
 
-      calibCard = `<div class="card${usbLock}">
+        calibCard = `<div class="card${usbLock}">
         <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
         <div style="margin:6px 0">
           <button class="btn sm danger" data-act="calib-zero" data-node="${nd.i}">Azzera calibrazione</button>
@@ -1113,12 +1134,13 @@ function renderNode(nd) {
           <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
         </div>
       </div>`;
+      }
 
-      body += `<div class="cards">
-          <div class="card"><div class="elem-title">Presenza <span class="pill ${presOn?'on':'off'}">${pres}</span></div></div>
-          <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>
-          ${powerCard}${energyCard}
-        </div>${warn}`;
+      if (anySensorCard) {
+        body += `<div class="cards">${presCard}${luxCard}${powerCard}${energyCard}</div>${warn}`;
+      } else {
+        body += warn;
+      }
     }
 
     if (hasLampKind) {
