@@ -389,7 +389,8 @@ async function importMeshFromFile(file) {
 
     if (!onoff.length && !level.length && !sensor.length) continue;
 
-    toImport.push({ addr, uuid, devkey, elemCount: elements.length || 1, onoff, level, sensor, group });
+    const name = (n.name || '').replace(/;/g, '');
+    toImport.push({ addr, uuid, devkey, elemCount: elements.length || 1, onoff, level, sensor, group, name });
   }
 
   if (!toImport.length) {
@@ -406,7 +407,7 @@ async function importMeshFromFile(file) {
   toImport.forEach((n, i) => {
     api.sendCmd(`CFG:IMPORTNODE;addr=${n.addr};uuid=${n.uuid};devkey=${n.devkey};elem=${n.elemCount}`
       + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')}`
-      + `;group=${n.group || ''}`);
+      + `;group=${n.group || ''};name=${n.name || ''}`);
     setMsg(`Importazione: ${i + 1}/${toImport.length} nodi accodati...`);
   });
   groups.forEach(g => {
