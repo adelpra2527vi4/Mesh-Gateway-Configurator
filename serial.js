@@ -258,6 +258,9 @@ export class GatewaySerial extends EventTarget {
           cfg: fields.cfg === '1', fail: fields.fail === '1', sw: fields.sw === '1',
           kind: parseInt(fields.kind, 10), grp: fields.grp === '1', paired: fields.paired === '1',
           lamp_elem: parseInt(fields.lamp_elem, 10), online: fields.online !== '0', name: fields.name || '',
+          // Gruppo mesh a cui e' sottoscritto secondo il file importato
+          // (0x0000 = nessuno, vedi CFG:IMPORTGROUP/mesh_handler.c).
+          grpaddr: fields.grpaddr && fields.grpaddr !== '0x0000' ? fields.grpaddr : null,
           elems: [], lvls: [], sensor: null,
         });
         break;

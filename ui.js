@@ -367,19 +367,29 @@ async function importMeshFromFile(file) {
     if (!addr || uuid.length !== 32 || !devkey) continue;
 
     const onoff = [], level = [], sensor = [];
+    let group = null; // primo indirizzo di gruppo trovato tra i modelli rilevanti
     elements.forEach((el, idx) => {
       const models = Array.isArray(el.models) ? el.models : [];
       for (const mod of models) {
         const id = (mod.modelId || '').toUpperCase();
+        const isRelevant = id === IMPORT_MODEL_ONOFF || id === IMPORT_MODEL_LEVEL
+          || id === IMPORT_MODEL_SENSOR;
+        if (!isRelevant) continue;
         if (id === IMPORT_MODEL_ONOFF && onoff.length < IMPORT_MAX_ELEM_OFFSETS) onoff.push(idx);
         else if (id === IMPORT_MODEL_LEVEL && level.length < IMPORT_MAX_ELEM_OFFSETS) level.push(idx);
         else if (id === IMPORT_MODEL_SENSOR && sensor.length < IMPORT_MAX_ELEM_OFFSETS) sensor.push(idx);
+        // Tutti i modelli di uno stesso nodo condividono di norma lo stesso
+        // gruppo (vedi il file: onoff/level/sensor di un nodo sottoscritti
+        // tutti a "C000" oppure tutti a "C001") - basta il primo trovato.
+        if (!group && Array.isArray(mod.subscribe) && mod.subscribe.length) {
+          group = mod.subscribe[0];
+        }
       }
     });
 
     if (!onoff.length && !level.length && !sensor.length) continue;
 
-    toImport.push({ addr, uuid, devkey, elemCount: elements.length || 1, onoff, level, sensor });
+    toImport.push({ addr, uuid, devkey, elemCount: elements.length || 1, onoff, level, sensor, group });
   }
 
   if (!toImport.length) {
@@ -395,7 +405,8 @@ async function importMeshFromFile(file) {
   api.sendCmd(`CFG:IMPORTNET;netkey=${netKey};appkey=${appKey};selfaddr=${selfAddr.toString(16)}`);
   toImport.forEach((n, i) => {
     api.sendCmd(`CFG:IMPORTNODE;addr=${n.addr};uuid=${n.uuid};devkey=${n.devkey};elem=${n.elemCount}`
-      + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')}`);
+      + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')}`
+      + `;group=${n.group || ''}`);
     setMsg(`Importazione: ${i + 1}/${toImport.length} nodi accodati...`);
   });
   groups.forEach(g => {
@@ -959,7 +970,18 @@ function renderNode(nd) {
   }
   const gearIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
 
-  const head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${fbtn}</div>`;
+  // Badge di appartenenza a un gruppo mesh (solo per reti importate da
+  // file, vedi CFG:IMPORTGROUP/grpaddr in CFG:NODE) - mostra il nome scelto
+  // per il gruppo se già arrivato (CFG:GROUP), altrimenti l'indirizzo grezzo
+  // cosi' non resta vuoto durante il breve intervallo tra i due dump.
+  const groupBadge = nd.grpaddr
+    ? (() => {
+        const grp = (lastState.groups || []).find(g => g.addr === nd.grpaddr);
+        return `<span class="badge" title="Gruppo mesh">${grp && grp.name ? grp.name : nd.grpaddr}</span>`;
+      })()
+    : '';
+
+  const head = `<div class="node${offline ? ' node-offline' : ''}"><div class="node-head">${nameInput}${groupBadge}${fbtn}</div>`;
 
   let body = '';
   // calibCard va nel pannello Impostazioni insieme a spunte/Rebind/
