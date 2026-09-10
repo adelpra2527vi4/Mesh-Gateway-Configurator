@@ -298,6 +298,106 @@ let prevHex = {};     // key mac|TYPE|id -> ultimo hex visto, per il confronto
 // della lista - vedi conversazione ("migliora il pannello sniffing").
 let seenSniffMacs = new Set();
 
+// --- Import di una rete mesh già provisionata da un file esterno (es.
+// export dell'app Android in formato CDB standard - vedi conversazione:
+// "meshprov_GDS_1.json"). Tutto il parsing/riduzione avviene qui in JS: il
+// gateway non sa nulla di JSON, riceve solo CFG:IMPORTNET/IMPORTNODE/
+// IMPORTEND già "distillati" ai soli modelli Generic OnOff/Level/Sensor
+// (0x1000/0x1002/0x1100) - qualunque modello vendor proprietario del file
+// viene ignorato, coerente con quanto gestisce oggi il resto della PWA.
+const IMPORT_MODEL_ONOFF = '1000';
+const IMPORT_MODEL_LEVEL = '1002';
+const IMPORT_MODEL_SENSOR = '1100';
+const IMPORT_MAX_ELEM_OFFSETS = 4; // NODE_META_MAX_ELEM lato firmware
+
+async function importMeshFromFile(file) {
+  const msgEl = document.getElementById('importmsg');
+  const setMsg = (t) => { if (msgEl) msgEl.textContent = t; };
+
+  let data;
+  try {
+    const text = await file.text();
+    data = JSON.parse(text);
+  } catch (e) {
+    alert('File non leggibile o non è un JSON valido.');
+    return;
+  }
+
+  const netKey = data && data.netKeys && data.netKeys[0] && data.netKeys[0].key;
+  const appKey = data && data.appKeys && data.appKeys[0] && data.appKeys[0].key;
+  const allNodes = Array.isArray(data && data.nodes) ? data.nodes : null;
+
+  if (!netKey || !appKey || !allNodes) {
+    alert('Il file non sembra un export di rete mesh valido (mancano netKeys/appKeys/nodes).');
+    return;
+  }
+
+  if (!confirm('Importare questa rete mesh sostituirà quella attualmente gestita da questo '
+    + 'gateway (nodi, chiavi, configurazione). Continuare?')) {
+    return;
+  }
+
+  // Indirizzo libero per il gateway stesso: calcolato QUI (non dal
+  // firmware) su TUTTI i nodi del file, non solo quelli che importiamo -
+  // anche un nodo che scartiamo (es. il "provisioner" del telefono, o uno
+  // senza modelli OnOff/Level/Sensor) occupa comunque quell'indirizzo sulla
+  // rete fisica reale, quindi va evitato lo stesso. mesh_handler_import_commit
+  // non può calcolarlo da solo: al momento di scegliere il proprio
+  // indirizzo il CDB del gateway è ancora vuoto (vedi mesh_handler.h).
+  let maxAddrEnd = 0;
+  for (const n of allNodes) {
+    const addr = parseInt(n.unicastAddress, 16);
+    const numElem = Array.isArray(n.elements) ? n.elements.length : 1;
+    if (!isNaN(addr)) maxAddrEnd = Math.max(maxAddrEnd, addr + numElem);
+  }
+  const selfAddr = maxAddrEnd + 1;
+
+  // Riduzione: per ogni nodo, per ogni elemento (l'indice nell'array è
+  // l'offset-elemento, 0-based, esattamente come lo intende il firmware),
+  // mappa i modelId sulle tre capacità note - un nodo senza nessuna delle
+  // tre viene scartato del tutto (es. il nodo "provisioner" del telefono,
+  // che ha solo il Config Server).
+  const toImport = [];
+  for (const n of allNodes) {
+    const addr = n.unicastAddress;
+    const uuid = (n.UUID || '').replace(/-/g, '');
+    const devkey = n.deviceKey;
+    const elements = Array.isArray(n.elements) ? n.elements : [];
+
+    if (!addr || uuid.length !== 32 || !devkey) continue;
+
+    const onoff = [], level = [], sensor = [];
+    elements.forEach((el, idx) => {
+      const models = Array.isArray(el.models) ? el.models : [];
+      for (const mod of models) {
+        const id = (mod.modelId || '').toUpperCase();
+        if (id === IMPORT_MODEL_ONOFF && onoff.length < IMPORT_MAX_ELEM_OFFSETS) onoff.push(idx);
+        else if (id === IMPORT_MODEL_LEVEL && level.length < IMPORT_MAX_ELEM_OFFSETS) level.push(idx);
+        else if (id === IMPORT_MODEL_SENSOR && sensor.length < IMPORT_MAX_ELEM_OFFSETS) sensor.push(idx);
+      }
+    });
+
+    if (!onoff.length && !level.length && !sensor.length) continue;
+
+    toImport.push({ addr, uuid, devkey, elemCount: elements.length || 1, onoff, level, sensor });
+  }
+
+  if (!toImport.length) {
+    alert('Nessun nodo con modelli Generic OnOff/Level/Sensor trovato nel file: niente da importare.');
+    return;
+  }
+
+  setMsg(`Importazione: 0/${toImport.length} nodi...`);
+  api.sendCmd(`CFG:IMPORTNET;netkey=${netKey};appkey=${appKey};selfaddr=${selfAddr.toString(16)}`);
+  toImport.forEach((n, i) => {
+    api.sendCmd(`CFG:IMPORTNODE;addr=${n.addr};uuid=${n.uuid};devkey=${n.devkey};elem=${n.elemCount}`
+      + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')}`);
+    setMsg(`Importazione: ${i + 1}/${toImport.length} nodi accodati...`);
+  });
+  api.sendCmd('CFG:IMPORTEND');
+  api.afterCmdRefresh(500);
+}
+
 export function init(a) {
   api = a;
 
@@ -323,6 +423,15 @@ export function init(a) {
   });
 
   document.getElementById('discbtn').addEventListener('click', toggleDiscovery);
+
+  document.getElementById('importbtn').addEventListener('click', () => {
+    document.getElementById('import-file-input').click();
+  });
+  document.getElementById('import-file-input').addEventListener('change', (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = ''; // permette di riselezionare lo stesso file una seconda volta
+    if (file) importMeshFromFile(file);
+  });
 
   document.getElementById('sniffbtn').addEventListener('click', toggleSniffer);
   document.getElementById('sniffclearbtn').addEventListener('click', () => {
@@ -473,7 +582,7 @@ export function renderState(state) {
 // banner e disabilitiamo i pulsanti che lancerebbero comandi di scrittura,
 // cosi' l'utente capisce perche' non succede nulla invece di vedere solo
 // errori in log.
-const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn'];
+const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn', 'importbtn'];
 
 function renderUsbModeBanner(usbMode) {
   // Il pallino accanto al titolo rispecchia il colore del LED fisico
@@ -1088,6 +1197,9 @@ export function onCmdResult(type, cmd) {
         if (el.textContent.startsWith('Inviato')) el.textContent = 'Errore firmware: comando rifiutato';
       });
     }
+  } else if (cmd === 'IMPORTEND') {
+    const m = document.getElementById('importmsg');
+    if (m) m.textContent = type === 'OK' ? 'Importazione completata' : 'Importazione fallita: vedi log';
   }
 }
 
