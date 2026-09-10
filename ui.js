@@ -387,12 +387,21 @@ async function importMeshFromFile(file) {
     return;
   }
 
+  // Gruppi del file (es. "test"->0xC000): solo etichetta+indirizzo, nessun
+  // filtro - a differenza dei nodi non c'è nulla da classificare qui.
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+
   setMsg(`Importazione: 0/${toImport.length} nodi...`);
   api.sendCmd(`CFG:IMPORTNET;netkey=${netKey};appkey=${appKey};selfaddr=${selfAddr.toString(16)}`);
   toImport.forEach((n, i) => {
     api.sendCmd(`CFG:IMPORTNODE;addr=${n.addr};uuid=${n.uuid};devkey=${n.devkey};elem=${n.elemCount}`
       + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')}`);
     setMsg(`Importazione: ${i + 1}/${toImport.length} nodi accodati...`);
+  });
+  groups.forEach(g => {
+    if (!g.address) return;
+    const name = (g.name || '').replace(/;/g, '');
+    api.sendCmd(`CFG:IMPORTGROUP;addr=${g.address};name=${name}`);
   });
   api.sendCmd('CFG:IMPORTEND');
   api.afterCmdRefresh(500);
@@ -687,7 +696,55 @@ function renderMesh() {
 
   renderDiscButton();
   renderDiscovered();
+  renderGroups();
   renderNodes();
+}
+
+// Gruppi mesh (es. importati da file, vedi CFG:IMPORTGROUP/CFG:GROUP): una
+// card per gruppo con on/off + dimming che comandano insieme tutti i nodi
+// già sottoscritti a quell'indirizzo, non un singolo nodo. Sezione nascosta
+// del tutto se non c'è nessun gruppo (rete provisionata dal vivo, oggi, non
+// ne crea mai).
+function renderGroups() {
+  const groups = lastState.groups || [];
+  const bar = document.getElementById('groups-bar');
+  const divider = document.getElementById('groups-divider');
+  const box = document.getElementById('groups-box');
+  if (!box) return;
+
+  const hasGroups = groups.length > 0;
+  if (bar) bar.hidden = !hasGroups;
+  if (divider) divider.hidden = !hasGroups;
+  if (!hasGroups) { box.innerHTML = ''; return; }
+
+  // Stessa protezione anti-refresh dello slider di livello per nodo
+  // (renderNodes/id "lvl_"): senza, il poll periodico di CFG:STATE (~2s)
+  // ricostruirebbe lo slider sotto al dito/mouse durante il trascinamento.
+  const act = document.activeElement;
+  if (act && act.id && act.id.startsWith('grplvl_') && box.contains(act)) return;
+
+  box.innerHTML = `<div class="cards${lastState.busy ? ' usb-locked' : ''}">` + groups.map(g => `
+    <div class="card">
+      <div class="elem-title">${g.name || g.addr}<span class="addr">${g.addr}</span></div>
+      <div class="row-btns">
+        <button class="btn primary sm" data-act="grpcmd" data-addr="${g.addr}" data-val="1">Accendi tutti</button>
+        <button class="btn sm" data-act="grpcmd" data-addr="${g.addr}" data-val="0">Spegni tutti</button>
+      </div>
+      <input type="range" min="0" max="100" value="100" class="slider" style="--p:100;margin-top:8px"
+             id="grplvl_${g.addr}" data-act="grplevel" data-addr="${g.addr}">
+    </div>`).join('') + `</div>`;
+
+  box.querySelectorAll('[data-act="grpcmd"]').forEach(el => {
+    el.addEventListener('click', () => {
+      api.sendCmd(`CFG:GRPCMD;addr=${el.dataset.addr};val=${el.dataset.val}`);
+    });
+  });
+  box.querySelectorAll('[data-act="grplevel"]').forEach(el => {
+    el.addEventListener('input', () => el.style.setProperty('--p', el.value));
+    el.addEventListener('change', () => {
+      api.sendCmd(`CFG:GRPLEVEL;addr=${el.dataset.addr};val=${el.value}`);
+    });
+  });
 }
 
 // Ricerca nuovi nodi ora e' su richiesta esplicita (CFG:DISCSTART/DISCSTOP,

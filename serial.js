@@ -192,7 +192,7 @@ export class GatewaySerial extends EventTarget {
     // 'sniffer') e il rumore rendeva impossibile vedere a occhio le righe che
     // contano davvero (DBG;, CFG:OK/ERR, comandi mandati, push) durante un
     // provisioning che richiede minuti - vedi conversazione.
-    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false }; this._armTimer(); return; }
+    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], groups: [], discovered: [], discActive: false }; this._armTimer(); return; }
     if (line === 'CFG:STATE_END') {
       this._clearBlockTimer();
       const st = this._stateAcc; this._stateAcc = null;
@@ -265,6 +265,13 @@ export class GatewaySerial extends EventTarget {
       case 'ELEM': {
         const node = st.nodes.find(x => x.i === parseInt(fields.node, 10));
         if (node) node.elems.push({ e: parseInt(fields.e, 10), addr: fields.addr, on: fields.on === '1' });
+        break;
+      }
+      case 'GROUP': {
+        // Gruppo mesh (es. importato da file, vedi CFG:IMPORTGROUP): un
+        // comando CFG:GRPCMD/CFG:GRPLEVEL su "addr" comanda insieme tutti i
+        // nodi già sottoscritti a quell'indirizzo di gruppo.
+        st.groups.push({ addr: fields.addr, name: fields.name || '' });
         break;
       }
       case 'LVL': {
