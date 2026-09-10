@@ -402,20 +402,65 @@ async function importMeshFromFile(file) {
   // filtro - a differenza dei nodi non c'è nulla da classificare qui.
   const groups = Array.isArray(data.groups) ? data.groups : [];
 
+  // Righe inviate una alla volta con sendCmdAwait (attende OK/ERR/timeout)
+  // e fino a 2 ritentativi se una riga va persa/corrotta sul ponte USB-UART
+  // (vedi conversazione: un CFG:IMPORTNODE ogni tanto arrivava troncato o
+  // mescolato col successivo, perdendo silenziosamente un nodo). Il
+  // chunking lento di serial.js riduce il problema alla radice, ma il
+  // ritentativo qui è una rete di sicurezza a costo quasi nullo.
+  const IMPORT_RETRIES = 2;
+  async function sendImportLine(line) {
+    for (let attempt = 0; attempt <= IMPORT_RETRIES; attempt++) {
+      const res = await api.sendCmdAwait(line);
+      if (res.type === 'OK') return { ok: true };
+      if (attempt < IMPORT_RETRIES) {
+        await new Promise((r) => setTimeout(r, 150));
+      } else {
+        return { ok: false, msg: res.msg || res.type };
+      }
+    }
+    return { ok: false, msg: 'errore sconosciuto' };
+  }
+
   setMsg(`Importazione: 0/${toImport.length} nodi...`);
-  api.sendCmd(`CFG:IMPORTNET;netkey=${netKey};appkey=${appKey};selfaddr=${selfAddr.toString(16)}`);
-  toImport.forEach((n, i) => {
-    api.sendCmd(`CFG:IMPORTNODE;addr=${n.addr};uuid=${n.uuid};devkey=${n.devkey};elem=${n.elemCount}`
+  const netRes = await sendImportLine(
+    `CFG:IMPORTNET;netkey=${netKey};appkey=${appKey};selfaddr=${selfAddr.toString(16)}`);
+  if (!netRes.ok) {
+    setMsg(`Importazione fallita: ${netRes.msg}`);
+    return;
+  }
+
+  const failedNodes = [];
+  for (let i = 0; i < toImport.length; i++) {
+    const n = toImport[i];
+    const line = `CFG:IMPORTNODE;addr=${n.addr};uuid=${n.uuid};devkey=${n.devkey};elem=${n.elemCount}`
       + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')}`
-      + `;group=${n.group || ''};name=${n.name || ''}`);
-    setMsg(`Importazione: ${i + 1}/${toImport.length} nodi accodati...`);
-  });
-  groups.forEach(g => {
-    if (!g.address) return;
+      + `;group=${n.group || ''};name=${n.name || ''}`;
+    const res = await sendImportLine(line);
+    if (!res.ok) failedNodes.push(n.name || n.addr);
+    setMsg(`Importazione: ${i + 1}/${toImport.length} nodi (${failedNodes.length} falliti)...`);
+  }
+
+  const failedGroups = [];
+  for (const g of groups) {
+    if (!g.address) continue;
     const name = (g.name || '').replace(/;/g, '');
-    api.sendCmd(`CFG:IMPORTGROUP;addr=${g.address};name=${name}`);
-  });
-  api.sendCmd('CFG:IMPORTEND');
+    const res = await sendImportLine(`CFG:IMPORTGROUP;addr=${g.address};name=${name}`);
+    if (!res.ok) failedGroups.push(name || g.address);
+  }
+
+  const endRes = await sendImportLine('CFG:IMPORTEND');
+  if (!endRes.ok) {
+    setMsg(`Importazione fallita: ${endRes.msg}`);
+    return;
+  }
+
+  if (failedNodes.length || failedGroups.length) {
+    setMsg(`Import completato con errori - nodi non importati: ${failedNodes.join(', ') || 'nessuno'}`
+      + (failedGroups.length ? `; gruppi non importati: ${failedGroups.join(', ')}` : ''));
+  } else {
+    setMsg(`Import completato: ${toImport.length} nodi, ${groups.length} gruppi.`);
+  }
   api.afterCmdRefresh(500);
 }
 

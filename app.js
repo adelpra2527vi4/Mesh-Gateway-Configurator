@@ -20,20 +20,22 @@ function cmdNameOf(line) {
   return semi >= 0 ? body.slice(0, semi) : body;
 }
 
-function enqueue(line) {
-  cmdQueue.push(line);
+function enqueue(line, resolve) {
+  cmdQueue.push({ line, resolve: resolve || null });
   pump();
 }
 
 function pump() {
   if (cmdInFlight || cmdQueue.length === 0) return;
-  const line = cmdQueue.shift();
+  const { line, resolve } = cmdQueue.shift();
   const name = cmdNameOf(line);
   cmdInFlight = {
     name,
+    resolve,
     timer: setTimeout(() => {
       ui.log(`(timeout: nessuna risposta per ${name})`, 'err');
       ui.onCmdResult('TIMEOUT', name);
+      if (resolve) resolve({ type: 'TIMEOUT', cmd: name, msg: '' });
       cmdInFlight = null;
       pump();
     }, CMD_TIMEOUT_MS),
@@ -41,9 +43,10 @@ function pump() {
   gw.send(line);
 }
 
-function settleInFlight(name) {
+function settleInFlight(name, result) {
   if (cmdInFlight && cmdInFlight.name === name) {
     clearTimeout(cmdInFlight.timer);
+    if (cmdInFlight.resolve) cmdInFlight.resolve(result || { type: 'OK', cmd: name, msg: '' });
     cmdInFlight = null;
     pump();
   }
@@ -61,6 +64,13 @@ function requestStatus() {
 }
 
 export function sendCmd(line) { enqueue(line); }
+// Come sendCmd, ma restituisce una Promise che si risolve con {type,cmd,msg}
+// quando arriva la risposta (OK/ERR/BUSY) o scade il timeout - usato
+// dall'import di rete per poter riprovare una singola riga CFG:IMPORTNODE/
+// IMPORTGROUP se va persa/corrotta sul ponte USB-UART (vedi conversazione).
+export function sendCmdAwait(line) {
+  return new Promise((resolve) => enqueue(line, resolve));
+}
 export function afterCmdRefresh(delayMs = 250) { setTimeout(requestState, delayMs); }
 export function afterStatusRefresh(delayMs = 250) { setTimeout(requestStatus, delayMs); }
 
@@ -108,8 +118,13 @@ gw.addEventListener('disconnected', () => {
   if (statePollTimer) { clearInterval(statePollTimer); statePollTimer = null; }
   if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
   stopSnifferPoll();
+  cmdQueue.forEach(({ resolve }) => { if (resolve) resolve({ type: 'TIMEOUT', cmd: '', msg: 'disconnesso' }); });
   cmdQueue = [];
-  if (cmdInFlight) { clearTimeout(cmdInFlight.timer); cmdInFlight = null; }
+  if (cmdInFlight) {
+    clearTimeout(cmdInFlight.timer);
+    if (cmdInFlight.resolve) cmdInFlight.resolve({ type: 'TIMEOUT', cmd: cmdInFlight.name, msg: 'disconnesso' });
+    cmdInFlight = null;
+  }
   statePending = false;
   statusPending = false;
 });
@@ -136,7 +151,7 @@ gw.addEventListener('sniffer', (e) => {
 
 gw.addEventListener('result', (e) => {
   const { type, cmd, msg } = e.detail;
-  settleInFlight(cmd);
+  settleInFlight(cmd, { type, cmd, msg });
   ui.onCmdResult(type, cmd);
   if (type === 'ERR') ui.log(`CFG:ERR;${cmd};${msg}`, 'err');
   if (type === 'BUSY') ui.log(`CFG:BUSY;${cmd}`, 'err');
@@ -338,7 +353,7 @@ document.getElementById('tb-mesh').addEventListener('click', () => ui.showTab('m
 document.getElementById('tb-beacon').addEventListener('click', () => ui.showTab('beacon'));
 document.getElementById('tb-device').addEventListener('click', () => ui.showTab('device'));
 
-ui.init({ sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw });
+ui.init({ sendCmd, sendCmdAwait, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw });
 
 if (!('serial' in navigator)) {
   document.getElementById('banner-nosupport').style.display = 'block';

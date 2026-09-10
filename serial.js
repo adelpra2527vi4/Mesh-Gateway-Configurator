@@ -131,7 +131,27 @@ export class GatewaySerial extends EventTarget {
       if (!this.port || !this.port.writable) return;
       const writer = this.port.writable.getWriter();
       try {
-        await writer.write(bytes);
+        // Stesso motivo del chunking BLE sopra e del k_sleep(3ms) lato
+        // firmware in cfg_uart_send_line: tra la PWA e la UART1 del gateway
+        // c'e' un ponte Arduino con un buffer seriale di sole ~64 byte. Una
+        // riga lunga (es. CFG:IMPORTNODE, ~150-200 byte) scritta in un solo
+        // colpo su USB arriva al ponte molto piu' veloce di quanto lui
+        // riesca a scaricarla sulla UART verso l'nRF, e i byte in eccesso
+        // vengono persi/corrotti (visto in pratica durante un import: alcune
+        // CFG:IMPORTNODE arrivavano al firmware troncate/mescolate). Si
+        // spezza quindi in chunk piccoli con una pausa tra uno e l'altro,
+        // cosi' il ponte fa in tempo a svuotare il buffer.
+        const USB_WRITE_CHUNK = 48;
+        if (bytes.length <= USB_WRITE_CHUNK) {
+          await writer.write(bytes);
+        } else {
+          for (let off = 0; off < bytes.length; off += USB_WRITE_CHUNK) {
+            await writer.write(bytes.slice(off, off + USB_WRITE_CHUNK));
+            if (off + USB_WRITE_CHUNK < bytes.length) {
+              await new Promise((r) => setTimeout(r, 5));
+            }
+          }
+        }
       } finally {
         writer.releaseLock();
       }
