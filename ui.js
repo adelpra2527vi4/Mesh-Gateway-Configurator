@@ -659,6 +659,8 @@ export function applyPush(detail) {
         node.sensor.pres = detail.presence ? 1 : 0;
         node.sensor.light = detail.lux >= 0 ? Math.round(detail.lux * 100) : -1;
         if (detail.lux >= 0) luxRawLive[node.i] = detail.lux;  // per il wizard di calibrazione
+        if (detail.power !== undefined) node.sensor.power = detail.power;
+        if (detail.energyWh !== undefined) node.sensor.energyWh = detail.energyWh;
         renderMesh();
         return;
       }
@@ -1018,6 +1020,17 @@ function renderNode(nd) {
       lastNodeVals[nd.i] = Object.assign(lastNodeVals[nd.i] || {}, { lux: luxStr });
       const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>` : '';
 
+      // Potenza/energia: solo se il device ha risposto almeno una volta a
+      // quella specifica proprietà (vedi power_x10/energy_wh in
+      // CFG:SENSOR_DATA, mesh_handler.c) - niente card "vuota" per i
+      // sensori presenza/lux che non la supportano affatto.
+      const powerCard = (s && s.power != null)
+        ? `<div class="card"><div class="elem-title">Potenza</div><div class="pctlbl" style="margin-top:6px">${s.power.toFixed(1)} W</div></div>`
+        : '';
+      const energyCard = (s && s.energyWh != null)
+        ? `<div class="card"><div class="elem-title">Energia</div><div class="pctlbl" style="margin-top:6px">${s.energyWh} Wh</div></div>`
+        : '';
+
       // Il firmware applica un fattore moltiplicativo per nodo (sensor_light_cal
       // in main.c: calibrato = grezzo * fattore / 1000) - un offset additivo
       // provato prima lasciava il buio (grezzo=0) diverso da 0 dopo calibrazione,
@@ -1049,6 +1062,7 @@ function renderNode(nd) {
       body += `<div class="cards">
           <div class="card"><div class="elem-title">Presenza <span class="pill ${presOn?'on':'off'}">${pres}</span></div></div>
           <div class="card"><div class="elem-title">Luce ambiente</div><div class="pctlbl${luxBump}" style="margin-top:6px">${luxStr}</div></div>
+          ${powerCard}${energyCard}
         </div>${warn}`;
     }
 

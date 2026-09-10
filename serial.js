@@ -284,7 +284,15 @@ export class GatewaySerial extends EventTarget {
       }
       case 'SENSOR_DATA': {
         const node = st.nodes.find(x => x.i === parseInt(fields.node, 10));
-        if (node) node.sensor = { pres: parseInt(fields.pres, 10), light: parseInt(fields.light, 10), hassens: fields.hassens === '1' };
+        // power_x10/energy_wh: -1 = sconosciuto (nessun Sensor Server di
+        // potenza sul device, o non ancora letto) - vedi mesh_handler.c.
+        const powerX10 = parseInt(fields.power_x10, 10);
+        const energyWh = parseInt(fields.energy_wh, 10);
+        if (node) node.sensor = {
+          pres: parseInt(fields.pres, 10), light: parseInt(fields.light, 10), hassens: fields.hassens === '1',
+          power: Number.isFinite(powerX10) && powerX10 >= 0 ? powerX10 / 10 : null,
+          energyWh: Number.isFinite(energyWh) && energyWh >= 0 ? energyWh : null,
+        };
         break;
       }
       case 'DISCACTIVE': st.discActive = fields.on === 'true'; break;
@@ -367,6 +375,8 @@ export class GatewaySerial extends EventTarget {
     if (fields.pct !== undefined) detail.pct = parseInt(fields.pct, 10);
     if (fields.presence !== undefined) detail.presence = fields.presence === '1';
     if (fields.lux !== undefined) detail.lux = parseFloat(fields.lux);
+    if (fields.w !== undefined) detail.power = parseFloat(fields.w);
+    if (fields.wh !== undefined) detail.energyWh = parseInt(fields.wh, 10);
     this.dispatchEvent(new CustomEvent('push', { detail }));
   }
 }
