@@ -6,15 +6,28 @@
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
 let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
 
-// Un gruppo mesh non ha un "livello" reale da leggere indietro (e' solo
-// un indirizzo a cui sono sottoscritti piu' nodi, ognuno col proprio stato) -
-// lo slider di gruppo era percio' sempre ridisegnato fisso al 100%, quindi
-// ogni valore impostato dall'utente spariva al giro di poll successivo
-// (~2s), dando l'impressione che "la barretta non si aggiorna". Si tiene
-// qui solo l'ultimo valore impostato localmente per gruppo, cosi' il
-// re-render periodico mostra quello invece di resettare sempre a 100 - vedi
-// conversazione ("devo fare piu' di un click e la barretta non si aggiorna").
-const groupLevelLocal = {};
+// La barretta di un gruppo deve rappresentare lo stato MEDIO reale delle
+// lampade sottoscritte, non un valore locale finto (un primo tentativo
+// teneva solo l'ultimo valore impostato dall'utente, resettato a 100/0 nei
+// bottoni Accendi/Spegni - "furbino, deve rappresentare lo stato medio
+// delle lampade", giustamente respinto). Per ogni nodo con nd.grpaddr ==
+// l'indirizzo del gruppo si usa il suo primo livello di dimming reale
+// (nd.lvls[0].pct, dallo stesso CFG:LVL polled periodicamente di ogni nodo)
+// se il modello Level e' presente, altrimenti l'on/off reale (nd.elems[0].on)
+// trattato come 100/0 - poi si fa la media. Stesso ritardo di un paio di
+// secondi di ogni altro stato "reale" nella UI (il polling round-robin del
+// firmware), non istantaneo come un valore locale, ma genuino.
+function groupAvgLevel(addr) {
+  const nodes = (lastState.nodes || []).filter((n) => n.grpaddr === addr);
+  let sum = 0, count = 0;
+  for (const n of nodes) {
+    let pct = null;
+    if (Array.isArray(n.lvls) && n.lvls.length) pct = n.lvls[0].pct;
+    else if (Array.isArray(n.elems) && n.elems.length) pct = n.elems[0].on ? 100 : 0;
+    if (Number.isFinite(pct)) { sum += pct; count++; }
+  }
+  return count ? Math.round(sum / count) : 0;
+}
 
 // Scanner QR companion: decodifica via jsQR (vendor/jsQR.min.js, libreria
 // locale nel progetto, MIT). jsQR lavora
@@ -846,7 +859,7 @@ function renderGroups() {
   }
 
   box.innerHTML = `<div class="cards${lastState.busy ? ' usb-locked' : ''}">` + groups.map(g => {
-    const lvl = groupLevelLocal[g.addr] != null ? groupLevelLocal[g.addr] : 100;
+    const lvl = groupAvgLevel(g.addr);
     return `
     <div class="card">
       <div class="elem-title">${g.name || g.addr}<span class="addr">${g.addr}</span></div>
@@ -861,28 +874,12 @@ function renderGroups() {
 
   box.querySelectorAll('[data-act="grpcmd"]').forEach(el => {
     el.addEventListener('click', () => {
-      const addr = el.dataset.addr;
-      const val = el.dataset.val;
-      api.sendCmd(`CFG:GRPCMD;addr=${addr};val=${val}`);
-      // "Accendi/Spegni tutti" e' un on/off, non un livello - ma la barretta
-      // sotto e' l'unico feedback visivo del gruppo, e restava sempre a 100
-      // (o all'ultimo livello impostato) anche dopo "Spegni tutti", dando
-      // l'impressione che il pulsante non avesse effetto. La si porta a
-      // 0/100 in linea con l'ultimo on/off inviato - vedi conversazione
-      // ("queste barre non si aggiornano nonostante sia spento tutto").
-      const lvl = val === '0' ? 0 : 100;
-      groupLevelLocal[addr] = lvl;
-      const slider = document.getElementById(`grplvl_${addr}`);
-      if (slider) {
-        slider.value = lvl;
-        slider.style.setProperty('--p', lvl);
-      }
+      api.sendCmd(`CFG:GRPCMD;addr=${el.dataset.addr};val=${el.dataset.val}`);
     });
   });
   box.querySelectorAll('[data-act="grplevel"]').forEach(el => {
     el.addEventListener('input', () => el.style.setProperty('--p', el.value));
     el.addEventListener('change', () => {
-      groupLevelLocal[el.dataset.addr] = el.value;
       api.sendCmd(`CFG:GRPLEVEL;addr=${el.dataset.addr};val=${el.value}`);
     });
   });
