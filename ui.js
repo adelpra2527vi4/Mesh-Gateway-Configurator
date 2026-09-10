@@ -861,7 +861,22 @@ function renderGroups() {
 
   box.querySelectorAll('[data-act="grpcmd"]').forEach(el => {
     el.addEventListener('click', () => {
-      api.sendCmd(`CFG:GRPCMD;addr=${el.dataset.addr};val=${el.dataset.val}`);
+      const addr = el.dataset.addr;
+      const val = el.dataset.val;
+      api.sendCmd(`CFG:GRPCMD;addr=${addr};val=${val}`);
+      // "Accendi/Spegni tutti" e' un on/off, non un livello - ma la barretta
+      // sotto e' l'unico feedback visivo del gruppo, e restava sempre a 100
+      // (o all'ultimo livello impostato) anche dopo "Spegni tutti", dando
+      // l'impressione che il pulsante non avesse effetto. La si porta a
+      // 0/100 in linea con l'ultimo on/off inviato - vedi conversazione
+      // ("queste barre non si aggiornano nonostante sia spento tutto").
+      const lvl = val === '0' ? 0 : 100;
+      groupLevelLocal[addr] = lvl;
+      const slider = document.getElementById(`grplvl_${addr}`);
+      if (slider) {
+        slider.value = lvl;
+        slider.style.setProperty('--p', lvl);
+      }
     });
   });
   box.querySelectorAll('[data-act="grplevel"]').forEach(el => {
