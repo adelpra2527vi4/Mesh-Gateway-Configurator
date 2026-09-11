@@ -1295,9 +1295,19 @@ function renderNode(nd) {
         const lastCtl = lastNodeVals[`ctl-${ctlKey}`]?.temp;
         const ctlBump = lastCtl !== undefined && lastCtl !== tempK ? ' animate-value-bump' : '';
         lastNodeVals[`ctl-${ctlKey}`] = { temp: tempK };
+        // Stesso meccanismo di riempimento --p dello slider luminosita'
+        // (.slider in style.css usa var(--p,0) come PERCENTUALE 0-100 per
+        // colorare il tratto già "attraversato" dal pallino) - qui pero'
+        // il valore nativo dell'input non e' gia' una percentuale (e' in
+        // Kelvin, 2700-6500), quindi va convertito esplicitamente, sia qui
+        // in rendering sia nel listener 'input' sotto (altrimenti --p resta
+        // sempre al default 0 e il riempimento colorato non segue mai il
+        // pallino, pur muovendosi il pallino nativo correttamente in base a
+        // min/max/value - vedi conversazione "il pallino non segue la barra").
+        const ctlPct = Math.round(((tempK - CTL_MIN) / (CTL_MAX - CTL_MIN)) * 100);
         cards += `<div class="card"><div class="elem-title">Colore<span class="pctlbl${ctlBump}" data-ctl-label="${nd.i}">${tempK}K</span></div>
-          <input type="range" min="${CTL_MIN}" max="${CTL_MAX}" step="50" value="${tempK}" class="slider ctl-slider"
-                 id="ctl_${nd.i}" data-act="ctl-input" data-node="${nd.i}"></div>`;
+          <input type="range" min="${CTL_MIN}" max="${CTL_MAX}" step="50" value="${tempK}" style="--p:${ctlPct}" class="slider ctl-slider"
+                 id="ctl_${nd.i}" data-act="ctl-input" data-node="${nd.i}" data-ctl-min="${CTL_MIN}" data-ctl-max="${CTL_MAX}"></div>`;
       }
       cards += `</div>`;
       body += cards;
@@ -1424,8 +1434,18 @@ function wireNodeEvents(box) {
     // label live durante il drag, invio CFG:CTL solo su "change" (rilascio),
     // rotellina con debounce.
     const label = box.querySelector(`[data-ctl-label="${el.dataset.node}"]`);
+    const ctlMin = parseInt(el.dataset.ctlMin, 10), ctlMax = parseInt(el.dataset.ctlMax, 10);
     const sendCtl = () => { api.sendCmd(`CFG:CTL;node=${el.dataset.node};val=${el.value}`); api.afterCmdRefresh(); };
-    el.addEventListener('input', () => { if (label) label.textContent = el.value + 'K'; });
+    el.addEventListener('input', () => {
+      if (label) label.textContent = el.value + 'K';
+      // Vedi commento in renderNode() sopra: --p va aggiornato come
+      // percentuale (non il valore Kelvin grezzo), altrimenti il
+      // riempimento colorato della barra resta fermo mentre il pallino
+      // nativo si muove regolarmente - stessa causa di "il pallino non
+      // segue la barra".
+      const pct = Math.round(((parseInt(el.value, 10) - ctlMin) / (ctlMax - ctlMin)) * 100);
+      el.style.setProperty('--p', pct);
+    });
     el.addEventListener('change', sendCtl);
     let ctlWheelDebounce = null;
     el.addEventListener('wheel', (e) => {
