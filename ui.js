@@ -471,9 +471,18 @@ async function importMeshFromFile(file) {
     return { ok: false, msg: 'errore sconosciuto' };
   }
 
+  // ivIndex (campo standard del CDB esportato): IV Index REALE della rete,
+  // quasi certamente diverso da 0 per una rete già viva da tempo - senza
+  // passarlo al firmware, il gateway si riprovisiona con IV Index 0 e i nodi
+  // fisici scartano ogni suo pacchetto in silenzio (mesh "muta" dopo
+  // l'import, mai nessun dato). Vedi conversazione: "sta attendendo dati...
+  // non si può accelerare?"/"una volta era velocissimo con il ble".
+  const ivIndex = Number.isInteger(data.ivIndex) ? data.ivIndex : 0;
+  const ivParam = `;iv=${ivIndex.toString(16)}`;
+
   setMsg(`Importazione: 0/${toImport.length} nodi...`);
   const netRes = await sendImportLine(
-    `CFG:IMPORTNET;netkey=${netKey};appkey=${appKey};selfaddr=${selfAddr.toString(16)}`);
+    `CFG:IMPORTNET;netkey=${netKey};appkey=${appKey};selfaddr=${selfAddr.toString(16)}${ivParam}`);
   if (!netRes.ok) {
     setMsg(`Importazione fallita: ${netRes.msg}`);
     return;
