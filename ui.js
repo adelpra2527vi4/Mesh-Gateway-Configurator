@@ -1260,8 +1260,14 @@ function renderNode(nd) {
       // stesso schema "nascondi la card se il device non supporta la
       // proprieta'" gia' usato per le card sensore (hassens).
       if (nd.ctl && nd.ctl.hasctl) {
-        const CTL_MIN = 800, CTL_MAX = 20000;
-        const tempK = nd.ctl.temp !== null ? nd.ctl.temp : 4000;
+        // Range pratico 2700-6500K, non lo span di specifica 800-20000
+        // (BT_MESH_LIGHT_TEMP_MIN/MAX): fuori da questo range il valore non
+        // ha senso fisico per i fixture DALI tunable-white reali - stesso
+        // range gia' usato in Manager.py e nell'app Android di riferimento
+        // (MeshProv, CTL_TEMPERATURE_MIN/MAX) per gli stessi dispositivi.
+        const CTL_MIN = 2700, CTL_MAX = 6500;
+        const tempKRaw = nd.ctl.temp !== null ? nd.ctl.temp : 4000;
+        const tempK = Math.min(CTL_MAX, Math.max(CTL_MIN, tempKRaw));
         const ctlKey = nd.i;
         const lastCtl = lastNodeVals[`ctl-${ctlKey}`]?.temp;
         const ctlBump = lastCtl !== undefined && lastCtl !== tempK ? ' animate-value-bump' : '';
@@ -1393,7 +1399,7 @@ function wireNodeEvents(box) {
       e.preventDefault();
       if (document.activeElement !== el) el.focus();
       const step = e.deltaY < 0 ? 50 : -50;
-      const next = Math.min(20000, Math.max(800, parseInt(el.value, 10) + step));
+      const next = Math.min(6500, Math.max(2700, parseInt(el.value, 10) + step));
       el.value = next; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change'));
       clearTimeout(ctlWheelDebounce); ctlWheelDebounce = setTimeout(sendCtl, 200);
     }, { passive: false });
