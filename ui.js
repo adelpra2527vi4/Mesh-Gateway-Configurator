@@ -638,6 +638,7 @@ export function setConnected(connected) {
     lastStatsShown = { lamps: null, sens: null };
     lastNodeVals = {};
     kindPending = {};
+    rebindPending = {};
     openSettingsNodes = new Set();
   }
 }
@@ -790,6 +791,10 @@ let lastNodeVals = {};
 // finche' il firmware non conferma (o scade come rete di sicurezza) - vedi
 // il commento in renderNode() sul bug "non fa deselezionare Lampada...".
 let kindPending = {}; // { [nd.i]: { combined, until } }
+// Feedback visivo "Rebind in corso..." (vedi renderNode/wireNodeEvents) -
+// stesso schema temporizzato di kindPending, nessuna conferma dedicata dal
+// firmware per un rebind completato.
+let rebindPending = {}; // { [nd.i]: { until } }
 // Pannello "Impostazioni" (<details class="node-settings">) aperto da un
 // nodo: renderNodes() ricostruisce l'intero innerHTML ad ogni poll (~2s),
 // quindi un <details> senza stato tracciato a parte torna sempre chiuso al
@@ -1090,7 +1095,25 @@ function renderNode(nd) {
   const grpBadge = hasLampKind
     ? (nd.grp ? `<span class="badge good">Gruppo OK</span>` : `<span class="badge warn">non rebindato</span>`)
     : '';
-  const rbtn = hasLampKind ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}">Rebind</button>` : '';
+  // rebindPending: CFG:OK;REBIND arriva quasi subito ma significa solo
+  // "richiesta accodata" (mesh_handler_node_rebind mette l'indirizzo in
+  // coda, vedi cfg_rebind() in cfg_protocol.c) - la vera riconfigurazione
+  // gira async nel thread di config, senza alcun evento "fatto" dedicato.
+  // Senza questo il pulsante non dava alcun segno di vita dopo il click -
+  // vedi conversazione ("non ho feedback visivo se sta facendo il
+  // rebind"). Stesso schema di kindPending: uno stato "in corso" con
+  // scadenza temporale, riletto qui ad ogni renderNode() (che altrimenti
+  // ricostruirebbe il pulsante da zero al prossimo poll, ~2s, perdendo
+  // qualunque manipolazione diretta del DOM fatta al click).
+  const rbPending = rebindPending[nd.i];
+  const rbLive = rbPending && Date.now() < rbPending.until;
+
+  if (rbPending && !rbLive) {
+    delete rebindPending[nd.i];
+  }
+  const rbtn = hasLampKind
+    ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}" ${rbLive ? 'disabled' : ''}>${rbLive ? 'Rebind in corso...' : 'Rebind'}</button>`
+    : '';
   // Companion switch: calcolato qui (non piu' in fondo dentro lampBlock)
   // cosi' puo' finire nel pannello Impostazioni insieme a spunte/Rebind -
   // vedi conversazione ("snellire la card, dentro un pulsante settings").
@@ -1356,7 +1379,17 @@ function wireNodeEvents(box) {
     });
   });
   box.querySelectorAll('[data-act="rebind"]').forEach(el => {
-    el.addEventListener('click', () => api.sendCmd(`CFG:REBIND;node=${el.dataset.node}`));
+    el.addEventListener('click', () => {
+      if (el.disabled) return;
+      // Stato "in corso" tracciato in rebindPending (letto da renderNode),
+      // non una mutazione diretta del DOM: il prossimo poll di CFG:STATE
+      // (~2s) ricostruisce comunque l'intera lista nodi da zero, che
+      // avrebbe subito cancellato un semplice el.disabled/el.textContent
+      // messo qui. Finestra di 8s: copre i retry interni del firmware
+      // (MESH_CFG_MAX_ATTEMPTS) su un link marginale.
+      rebindPending[el.dataset.node] = { until: Date.now() + 8000 };
+      api.sendCmd(`CFG:REBIND;node=${el.dataset.node}`);
+    });
   });
   box.querySelectorAll('[data-act="forget"]').forEach(el => {
     el.addEventListener('click', () => { if (confirm('Rimuovere questo nodo?')) api.sendCmd(`CFG:FORGET;node=${el.dataset.node}`); });
