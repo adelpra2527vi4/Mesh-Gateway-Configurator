@@ -1010,6 +1010,9 @@ function renderNodes() {
     // range sotto al dito/mouse e il pallino "scatta" indietro alla vecchia
     // posizione - stessa protezione degli altri controlli interattivi.
     if (act.id.startsWith('lvl_')) return;
+    // Stessa protezione dello slider luminosita', per lo slider temperatura
+    // colore (CFG:CTL).
+    if (act.id.startsWith('ctl_')) return;
     // Se l'utente sta scrivendo in un campo che non sia il nome nodo,
     // salta il re-render per non disturbare il cursore.
     if (!act.id.startsWith('nm_')) return;
@@ -1251,6 +1254,22 @@ function renderNode(nd) {
           <input type="range" min="0" max="100" value="${lv.pct}" class="slider" style="--p:${lv.pct}"
                  id="lvl_${nd.i}_${lv.li}" data-act="level-input" data-node="${nd.i}" data-li="${lv.li}"></div>`;
       }
+      // Temperatura colore (Light CTL Temperature) - solo se il nodo ha
+      // davvero un Light CTL Temperature Server (nd.ctl.hasctl, vedi
+      // node_dump_cb in mesh_handler.c), non solo perche' e' una lampada:
+      // stesso schema "nascondi la card se il device non supporta la
+      // proprieta'" gia' usato per le card sensore (hassens).
+      if (nd.ctl && nd.ctl.hasctl) {
+        const CTL_MIN = 800, CTL_MAX = 20000;
+        const tempK = nd.ctl.temp !== null ? nd.ctl.temp : 4000;
+        const ctlKey = nd.i;
+        const lastCtl = lastNodeVals[`ctl-${ctlKey}`]?.temp;
+        const ctlBump = lastCtl !== undefined && lastCtl !== tempK ? ' animate-value-bump' : '';
+        lastNodeVals[`ctl-${ctlKey}`] = { temp: tempK };
+        cards += `<div class="card"><div class="elem-title">Colore<span class="pctlbl${ctlBump}" data-ctl-label="${nd.i}">${tempK}K</span></div>
+          <input type="range" min="${CTL_MIN}" max="${CTL_MAX}" step="50" value="${tempK}" class="slider ctl-slider"
+                 id="ctl_${nd.i}" data-act="ctl-input" data-node="${nd.i}"></div>`;
+      }
       cards += `</div>`;
       body += cards;
     }
@@ -1357,11 +1376,26 @@ function wireNodeEvents(box) {
       if (document.activeElement !== el) el.focus();
       const step = e.deltaY < 0 ? 1 : -1;
       const next = Math.min(100, Math.max(0, parseInt(el.value, 10) + step));
-      el.value = next;
-      if (label) label.textContent = next + '%';
-      el.style.setProperty('--p', next);
-      clearTimeout(wheelDebounce);
-      wheelDebounce = setTimeout(sendLevel, 250);
+      el.value = next; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change'));
+      clearTimeout(wheelDebounce); wheelDebounce = setTimeout(sendLevel, 200);
+    }, { passive: false });
+  });
+  box.querySelectorAll('[data-act="ctl-input"]').forEach(el => {
+    // Stesso schema esatto dello slider luminosita' sopra (level-input):
+    // label live durante il drag, invio CFG:CTL solo su "change" (rilascio),
+    // rotellina con debounce.
+    const label = box.querySelector(`[data-ctl-label="${el.dataset.node}"]`);
+    const sendCtl = () => { api.sendCmd(`CFG:CTL;node=${el.dataset.node};val=${el.value}`); api.afterCmdRefresh(); };
+    el.addEventListener('input', () => { if (label) label.textContent = el.value + 'K'; });
+    el.addEventListener('change', sendCtl);
+    let ctlWheelDebounce = null;
+    el.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (document.activeElement !== el) el.focus();
+      const step = e.deltaY < 0 ? 50 : -50;
+      const next = Math.min(20000, Math.max(800, parseInt(el.value, 10) + step));
+      el.value = next; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change'));
+      clearTimeout(ctlWheelDebounce); ctlWheelDebounce = setTimeout(sendCtl, 200);
     }, { passive: false });
   });
   box.querySelectorAll('[data-act="qrscan"]').forEach(el => {
@@ -1421,9 +1455,15 @@ function wireNodeEvents(box) {
 export function renderStatus(status) {
   lastStatus = status;
 
-  if (document.activeElement !== document.getElementById('hubname-input')) {
-    // niente da riempire: il nome hub non e' nel protocollo CFG:STATUS,
-    // l'utente lo digita e basta (placeholder mostra l'ultimo salvato via msg).
+  // Il firmware ora include CFG:HUBNAME nel blocco CFG:STATUS (prima era
+  // solo scrittura, un reload della PWA mostrava sempre il campo vuoto anche
+  // col nome gia' impostato sul gateway - vedi conversazione: "vorrei che la
+  // pwa lo leggesse il nome settato"). Non tocca il campo se l'utente ci sta
+  // scrivendo dentro in questo momento (stesso guard anti-refresh usato
+  // altrove per gli input, es. renderGroups).
+  const hubnameInput = document.getElementById('hubname-input');
+  if (hubnameInput && document.activeElement !== hubnameInput && status.hubName !== undefined) {
+    hubnameInput.value = status.hubName;
   }
 
   renderRelays();

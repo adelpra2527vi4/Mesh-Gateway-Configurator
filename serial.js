@@ -219,7 +219,7 @@ export class GatewaySerial extends EventTarget {
       if (st) this.dispatchEvent(new CustomEvent('state', { detail: st }));
       return;
     }
-    if (line === 'CFG:STATUS_START') { this._statusAcc = { relays: [], blesensors: [], mqttState: -1, mqttLast: '' }; this._armTimer(); return; }
+    if (line === 'CFG:STATUS_START') { this._statusAcc = { relays: [], blesensors: [], mqttState: -1, mqttLast: '', hubName: '' }; this._armTimer(); return; }
     if (line === 'CFG:STATUS_END') {
       this._clearBlockTimer();
       const st = this._statusAcc; this._statusAcc = null;
@@ -281,7 +281,7 @@ export class GatewaySerial extends EventTarget {
           // Gruppo mesh a cui e' sottoscritto secondo il file importato
           // (0x0000 = nessuno, vedi CFG:IMPORTGROUP/mesh_handler.c).
           grpaddr: fields.grpaddr && fields.grpaddr !== '0x0000' ? fields.grpaddr : null,
-          elems: [], lvls: [], sensor: null,
+          elems: [], lvls: [], sensor: null, ctl: null,
         });
         break;
       }
@@ -320,6 +320,19 @@ export class GatewaySerial extends EventTarget {
           hassens: fields.hassens === '1',
           power: Number.isFinite(powerX10) && powerX10 >= 0 ? powerX10 / 10 : null,
           energyWh: Number.isFinite(energyWh) && energyWh >= 0 ? energyWh : null,
+        };
+        break;
+      }
+      case 'CTL': {
+        // Temperatura colore (Light CTL Temperature, Kelvin) - riga separata
+        // da CFG:NODE come CFG:SENSOR_DATA sopra, "hasctl=1" solo se il nodo
+        // ha davvero un Light CTL Temperature Server (vedi node_dump_cb in
+        // mesh_handler.c).
+        const node = st.nodes.find(x => x.i === parseInt(fields.node, 10));
+        const temp = parseInt(fields.temp, 10);
+        if (node) node.ctl = {
+          hasctl: fields.hasctl === '1',
+          temp: Number.isFinite(temp) && temp >= 0 ? temp : null,
         };
         break;
       }
@@ -366,6 +379,13 @@ export class GatewaySerial extends EventTarget {
     } else if (type === 'MQTTLAST') {
       const m = line.match(/;last=([\s\S]*)$/);
       st.mqttLast = m ? m[1] : '';
+    } else if (type === 'HUBNAME') {
+      // "name=" e' sempre l'ultimo campo (puo' contenere ';', stesso motivo
+      // di MQTTLAST sopra) - prima CFG:SETHUBNAME era solo scrittura, la PWA
+      // non lo rileggeva mai da CFG:STATUS (vedi conversazione: "vorrei che
+      // la pwa lo leggesse il nome settato").
+      const m = line.match(/;name=([\s\S]*)$/);
+      st.hubName = m ? m[1] : '';
     }
   }
 
