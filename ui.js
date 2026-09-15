@@ -539,10 +539,21 @@ export function init(a) {
     const m = document.getElementById('savemsg'); if (m) m.textContent = '...';
     api.sendCmd('CFG:MESHSAVE');
   });
-  document.getElementById('btn-reset').addEventListener('click', () => {
-    if (!confirm('Resettare tutta la rete mesh?')) return;
-    api.sendCmd('CFG:RESET');
-    startResetCountdown();
+  document.getElementById('btn-reset').addEventListener('click', async () => {
+    // CFG:RESETMESH (non piu' CFG:RESET, vedi conversazione: "va ad
+    // eliminare anche il nome dispositivo, i relay e i sensori classici")
+    // tocca SOLO la rete mesh - nome hub/relè/slot BLE classico restano
+    // intatti. Nessun riavvio del gateway: niente countdown di
+    // riconnessione, resta tutto sulla stessa connessione seriale/BLE.
+    if (!confirm('Svuotare la rete mesh? Nodi e gruppi mesh verranno rimossi (nome dispositivo, relè e sensori BLE classici restano invariati).')) return;
+    const msgBox = document.getElementById('reset-countdown');
+    if (msgBox) { msgBox.style.display = 'block'; msgBox.textContent = 'Reset rete mesh in corso...'; }
+    const res = await api.sendCmdAwait('CFG:RESETMESH');
+    if (msgBox) {
+      msgBox.textContent = res.type === 'OK' ? 'Rete mesh svuotata.' : `Reset fallito: ${res.msg || res.type}`;
+      setTimeout(() => { msgBox.style.display = 'none'; }, 3000);
+    }
+    api.afterCmdRefresh(300);
   });
 
   document.getElementById('btn-sethubname').addEventListener('click', () => {
@@ -680,20 +691,6 @@ export function log(line, kind) {
 export function clearLog() {
   document.querySelectorAll('.log-panel').forEach(p => { p.innerHTML = ''; });
   logLines = 0;
-}
-
-function startResetCountdown() {
-  let n = 5;
-  const box = document.getElementById('reset-countdown');
-  box.style.display = 'block';
-  box.classList.add('animate-fade-in-up');
-  box.textContent = `Riavvio in corso... riconnettiti tra ${n} secondi`;
-  const t = setInterval(() => {
-    n--;
-    if (n <= 0) { clearInterval(t); box.style.display = 'none'; return; }
-    box.textContent = `Riavvio in corso... riconnettiti tra ${n} secondi`;
-  }, 1000);
-  api.gw.disconnect();
 }
 
 // ============================================================
