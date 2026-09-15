@@ -461,7 +461,7 @@ async function importMeshFromFile(file) {
   async function sendImportLine(line) {
     for (let attempt = 0; attempt <= IMPORT_RETRIES; attempt++) {
       const res = await api.sendCmdAwait(line);
-      if (res.type === 'OK') return { ok: true };
+      if (res.type === 'OK') return { ok: true, msg: res.msg };
       if (attempt < IMPORT_RETRIES) {
         await new Promise((r) => setTimeout(r, 150));
       } else {
@@ -519,9 +519,19 @@ async function importMeshFromFile(file) {
     return;
   }
 
+  // CFG:OK;IMPORTEND;imported=X/Y (vedi cfg_importend in cfg_protocol.c): il
+  // firmware ha accettato ogni riga CFG:IMPORTNODE individualmente (OK), ma
+  // durante il commit finale uno o più nodi possono non entrare comunque nel
+  // CDB (es. CONFIG_BT_MESH_CDB_NODE_COUNT esaurito) - un fallimento
+  // invisibile a questo livello prima d'ora (vedi conversazione "wtf?").
+  const importedMatch = /^imported=(\d+)\/(\d+)/.exec(endRes.msg || '');
+
   if (failedNodes.length || failedGroups.length) {
     setMsg(`Import completato con errori - nodi non importati: ${failedNodes.join(', ') || 'nessuno'}`
       + (failedGroups.length ? `; gruppi non importati: ${failedGroups.join(', ')}` : ''));
+  } else if (importedMatch && importedMatch[1] !== importedMatch[2]) {
+    setMsg(`Import parziale: solo ${importedMatch[1]}/${importedMatch[2]} nodi entrati nel database del gateway `
+      + `(limite CONFIG_BT_MESH_CDB_NODE_COUNT nel firmware) - alcuni dispositivi non compariranno.`);
   } else {
     setMsg(`Import completato: ${toImport.length} nodi, ${groups.length} gruppi.`);
   }
@@ -554,6 +564,35 @@ export function init(a) {
       setTimeout(() => { msgBox.style.display = 'none'; }, 3000);
     }
     api.afterCmdRefresh(300);
+  });
+
+  // CFG:RESET (non CFG:RESETMESH sopra): cancella l'INTERA partizione flash
+  // di storage - nome hub, relè, slot BLE classico E rete mesh, tutto
+  // insieme. Bottone separato reintrodotto per gestire un caso specifico:
+  // la partizione NVS satura/frammentata dopo troppi cicli di
+  // test/import/reset ravvicinati fa fallire silenziosamente le scritture
+  // interne della rete mesh (bt_mesh_cdb "Failed to clear Network" nel log
+  // firmware, poi bt_mesh_provision fallisce con ENODEV) - un
+  // CFG:RESETMESH da solo non basta perché scrive anch'esso sulla stessa
+  // NVS piena. Il device si riavvia da solo dopo, niente CFG:OK atteso
+  // (vedi cfg_reset in cfg_protocol.c).
+  document.getElementById('btn-factory-reset').addEventListener('click', () => {
+    if (!confirm('ATTENZIONE: azzera l\'intera memoria del gateway, non solo la rete mesh - '
+      + 'nome hub, relè, slot sensori BLE classici e rete mesh andranno TUTTI persi. '
+      + 'Usalo solo se "Svuota e resetta rete mesh" non basta (es. errori di scrittura ripetuti). Continuare?')) return;
+    api.sendCmd('CFG:RESET');
+    const msgBox = document.getElementById('reset-countdown');
+    if (msgBox) {
+      msgBox.style.display = 'block';
+      let n = 5;
+      msgBox.textContent = `Reset di fabbrica, riavvio in corso... riconnettiti tra ${n} secondi`;
+      const t = setInterval(() => {
+        n--;
+        if (n <= 0) { clearInterval(t); msgBox.style.display = 'none'; return; }
+        msgBox.textContent = `Reset di fabbrica, riavvio in corso... riconnettiti tra ${n} secondi`;
+      }, 1000);
+    }
+    api.gw.disconnect();
   });
 
   document.getElementById('btn-sethubname').addEventListener('click', () => {
@@ -714,7 +753,7 @@ export function renderState(state) {
 // banner e disabilitiamo i pulsanti che lancerebbero comandi di scrittura,
 // cosi' l'utente capisce perche' non succede nulla invece di vedere solo
 // errori in log.
-const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn', 'importbtn'];
+const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-factory-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn', 'importbtn'];
 
 function renderUsbModeBanner(usbMode) {
   // Il pallino accanto al titolo rispecchia il colore del LED fisico
