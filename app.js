@@ -46,6 +46,17 @@ function pump() {
     timer: setTimeout(() => {
       ui.log(`(timeout: nessuna risposta per ${name})`, 'err');
       ui.onCmdResult('TIMEOUT', name);
+      // CFG:STATE/CFG:STATUS non passano da settleInFlight in caso di
+      // successo (le risolve l'evento 'state'/'status' dedicato, vedi sopra)
+      // ma qui in caso di timeout arrivano comunque da questa stessa coda -
+      // senza questo, un solo CFG:STATE/CFG:STATUS perso (es. gateway
+      // occupato durante un import) lasciava statePending/statusPending
+      // bloccato per sempre: sia il poll automatico ogni 2s sia il pulsante
+      // di refresh manuale restavano no-op finché non ci si disconnetteva e
+      // riconnetteva da capo. Vedi conversazione ("la rotella per il
+      // refresh non fa nulla" / "i dati non refreshano").
+      if (name === 'STATE') statePending = false;
+      if (name === 'STATUS') statusPending = false;
       if (resolve) resolve({ type: 'TIMEOUT', cmd: name, msg: '' });
       cmdInFlight = null;
       pump();

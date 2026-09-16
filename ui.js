@@ -331,6 +331,15 @@ let seenSniffMacs = new Set();
 const IMPORT_MODEL_ONOFF = '1000';
 const IMPORT_MODEL_LEVEL = '1002';
 const IMPORT_MODEL_SENSOR = '1100';
+// Light CTL Server (temperatura colore, es. SR Dongle) - mancava del tutto
+// nella riduzione dell'import: un nodo con questo modello veniva importato
+// come lampada onoff/level normale, ma senza ctl_offsets/ctl_count lato
+// firmware nessun poll periodico leggeva mai lo stato colore (vedi
+// mesh_poll_thread_fn) e la card non mostrava mai lo slider colore dopo un
+// import da file, a differenza di un nodo provisionato dal vivo (Composition
+// Data Get, che lo scopre da solo). Vedi conversazione ("sr dongle non ha
+// la barra del colore").
+const IMPORT_MODEL_CTL = '1303';
 const IMPORT_MAX_ELEM_OFFSETS = 4; // NODE_META_MAX_ELEM lato firmware
 
 // CFG:IMPORTEND può metterci fino a decine di secondi (vedi timeout dedicato
@@ -405,14 +414,14 @@ async function importMeshFromFile(file) {
 
     if (!addr || uuid.length !== 32 || !devkey) continue;
 
-    const onoff = [], level = [], sensor = [];
+    const onoff = [], level = [], sensor = [], ctl = [];
     let group = null; // primo indirizzo di gruppo trovato tra i modelli rilevanti
     elements.forEach((el, idx) => {
       const models = Array.isArray(el.models) ? el.models : [];
       for (const mod of models) {
         const id = (mod.modelId || '').toUpperCase();
         const isRelevant = id === IMPORT_MODEL_ONOFF || id === IMPORT_MODEL_LEVEL
-          || id === IMPORT_MODEL_SENSOR;
+          || id === IMPORT_MODEL_SENSOR || id === IMPORT_MODEL_CTL;
         if (!isRelevant) continue;
         // "bind" vuoto significa che il modello NON ha mai ricevuto un
         // Config Model App Bind sul dispositivo reale (visto nel file: uno
@@ -427,6 +436,7 @@ async function importMeshFromFile(file) {
         if (id === IMPORT_MODEL_ONOFF && onoff.length < IMPORT_MAX_ELEM_OFFSETS) onoff.push(idx);
         else if (id === IMPORT_MODEL_LEVEL && level.length < IMPORT_MAX_ELEM_OFFSETS) level.push(idx);
         else if (id === IMPORT_MODEL_SENSOR && sensor.length < IMPORT_MAX_ELEM_OFFSETS) sensor.push(idx);
+        else if (id === IMPORT_MODEL_CTL && ctl.length < IMPORT_MAX_ELEM_OFFSETS) ctl.push(idx);
         // Tutti i modelli di uno stesso nodo condividono di norma lo stesso
         // gruppo (vedi il file: onoff/level/sensor di un nodo sottoscritti
         // tutti a "C000" oppure tutti a "C001") - basta il primo trovato.
@@ -436,10 +446,10 @@ async function importMeshFromFile(file) {
       }
     });
 
-    if (!onoff.length && !level.length && !sensor.length) continue;
+    if (!onoff.length && !level.length && !sensor.length && !ctl.length) continue;
 
     const name = (n.name || '').replace(/;/g, '');
-    toImport.push({ addr, uuid, devkey, elemCount: elements.length || 1, onoff, level, sensor, group, name });
+    toImport.push({ addr, uuid, devkey, elemCount: elements.length || 1, onoff, level, sensor, ctl, group, name });
   }
 
   if (!toImport.length) {
@@ -492,7 +502,7 @@ async function importMeshFromFile(file) {
   for (let i = 0; i < toImport.length; i++) {
     const n = toImport[i];
     const line = `CFG:IMPORTNODE;addr=${n.addr};uuid=${n.uuid};devkey=${n.devkey};elem=${n.elemCount}`
-      + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')}`
+      + `;onoff=${n.onoff.join(',')};level=${n.level.join(',')};sensor=${n.sensor.join(',')};ctl=${n.ctl.join(',')}`
       + `;group=${n.group || ''};name=${n.name || ''}`;
     const res = await sendImportLine(line);
     if (!res.ok) failedNodes.push(n.name || n.addr);
