@@ -440,8 +440,18 @@ async function importMeshFromFile(file) {
         // Tutti i modelli di uno stesso nodo condividono di norma lo stesso
         // gruppo (vedi il file: onoff/level/sensor di un nodo sottoscritti
         // tutti a "C000" oppure tutti a "C001") - basta il primo trovato.
+        // Il Sensor Server pero' non si iscrive mai a un gruppo (non riceve
+        // comandi): il suo appartenere al gruppo si esprime nel file con
+        // "publish.address" (pubblica li' le letture), MAI in "subscribe"
+        // (sempre vuoto/assente per quel modello). Senza questo fallback un
+        // nodo con solo Sensor Server (0x1100) restava sempre senza gruppo
+        // anche quando nel file era chiaramente assegnato a uno - vedi
+        // conversazione: "i sensori ancora non vengono messi nel gruppo
+        // corretto"/"anche nella pwa non vengono dichiarati di nessun gruppo".
         if (!group && Array.isArray(mod.subscribe) && mod.subscribe.length) {
           group = mod.subscribe[0];
+        } else if (!group && mod.publish && mod.publish.address) {
+          group = mod.publish.address;
         }
       }
     });
