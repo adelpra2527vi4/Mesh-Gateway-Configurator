@@ -718,6 +718,7 @@ export function setConnected(connected) {
     lastNodeVals = {};
     kindPending = {};
     rebindPending = {};
+    rebindResult = {};
     openSettingsNodes = new Set();
   }
 }
@@ -859,7 +860,41 @@ let kindPending = {}; // { [nd.i]: { combined, until } }
 // Feedback visivo "Rebind in corso..." (vedi renderNode/wireNodeEvents) -
 // stesso schema temporizzato di kindPending, nessuna conferma dedicata dal
 // firmware per un rebind completato.
-let rebindPending = {}; // { [nd.i]: { until } }
+let rebindPending = {}; // { [nd.i]: { since, until, sawBusy, lastBusy } }
+// Esito mostrato per qualche secondo dopo la fine di un rebind, nel pill di
+// stato della card (sempre visibile, non dentro l'ingranaggio Impostazioni).
+let rebindResult = {}; // { [nd.i]: { ok, until } }
+
+// Il firmware risponde CFG:OK;REBIND subito ("accodato"): la riconfigurazione
+// vera (AppKey Add, bind, sottoscrizioni, ~15-25 s per nodo, un nodo alla
+// volta) non ha un evento "fatto". Si deduce dal flag globale CFG:BUSY: il
+// rebind e' finito quando il gateway e' stato visto occupato e poi torna
+// libero da qualche secondo; l'esito (ok/fallito) si legge da cfg/fail del
+// nodo. Rete di sicurezza: scade comunque a `until`.
+function updateRebindProgress() {
+  const now = Date.now();
+
+  for (const i of Object.keys(rebindPending)) {
+    const p = rebindPending[i];
+
+    if (lastState.busy) {
+      p.sawBusy = true;
+      p.lastBusy = now;
+    }
+    const idle = !lastState.busy && p.sawBusy && (now - p.lastBusy) > 3500;
+    const neverStarted = !p.sawBusy && (now - p.since) > 12000;
+
+    if (idle || neverStarted || now > p.until) {
+      const nd = lastState.nodes.find(n => String(n.i) === String(i));
+
+      rebindResult[i] = { ok: !!(nd && nd.cfg && !nd.fail), until: now + 20000 };
+      delete rebindPending[i];
+    }
+  }
+  for (const i of Object.keys(rebindResult)) {
+    if (now > rebindResult[i].until) delete rebindResult[i];
+  }
+}
 // Pannello "Impostazioni" (<details class="node-settings">) aperto da un
 // nodo: renderNodes() ricostruisce l'intero innerHTML ad ogni poll (~2s),
 // quindi un <details> senza stato tracciato a parte torna sempre chiuso al
@@ -880,6 +915,7 @@ function bumpIfChanged(el, newVal, key) {
 }
 
 function renderMesh() {
+  updateRebindProgress();
   const nl = lastState.nodes.filter(n => !n.sw && (n.kind & 1)).length;
   const ns = lastState.nodes.filter(n => !n.sw && (n.kind & 2)).length;
   bumpIfChanged(document.getElementById('st-lamps'), nl, 'lamps');
@@ -1127,8 +1163,19 @@ function renderNode(nd) {
   }
 
   const offline = nd.cfg && !nd.online;
-  const stCls = offline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
-  const stTxt = offline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
+  let stCls = offline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
+  let stTxt = offline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
+  // Stato del rebind nel pill sempre visibile della card (prima era solo nel
+  // pulsante dentro il pannello Impostazioni, per 8 s): "in coda/in corso"
+  // finche' il gateway lavora, poi l'esito per qualche secondo - vedi
+  // updateRebindProgress().
+  if (rebindPending[nd.i]) {
+    stCls = 'wait';
+    stTxt = 'Rebind in corso...';
+  } else if (rebindResult[nd.i]) {
+    stCls = rebindResult[nd.i].ok ? 'ok' : 'err';
+    stTxt = rebindResult[nd.i].ok ? 'Rebind completato' : 'Rebind fallito';
+  }
   // "kind" e' una bitmask (1=lampada, 2=sensore, 3=entrambi), non piu' una
   // scelta esclusiva: un device combo (es. dongle SR con 2 LED + PIR/LUX)
   // puo' avere entrambe le capacita' gestite insieme, ognuna con le sue
@@ -1462,8 +1509,16 @@ function wireNodeEvents(box) {
       // avrebbe subito cancellato un semplice el.disabled/el.textContent
       // messo qui. Finestra di 8s: copre i retry interni del firmware
       // (MESH_CFG_MAX_ATTEMPTS) su un link marginale.
-      rebindPending[el.dataset.node] = { until: Date.now() + 8000 };
+      // Il tempo massimo e' lungo (2 min) perche' i rebind sono accodati e il
+      // gateway ne fa uno alla volta: la fine vera la decide
+      // updateRebindProgress() da CFG:BUSY, questa scadenza e' solo la rete
+      // di sicurezza.
+      delete rebindResult[el.dataset.node];
+      rebindPending[el.dataset.node] = {
+        since: Date.now(), until: Date.now() + 120000, sawBusy: false, lastBusy: 0,
+      };
       api.sendCmd(`CFG:REBIND;node=${el.dataset.node}`);
+      api.afterCmdRefresh();
     });
   });
   box.querySelectorAll('[data-act="forget"]').forEach(el => {
