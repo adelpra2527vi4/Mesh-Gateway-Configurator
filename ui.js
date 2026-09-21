@@ -920,6 +920,20 @@ function renderMesh() {
   const ns = lastState.nodes.filter(n => !n.sw && (n.kind & 2)).length;
   bumpIfChanged(document.getElementById('st-lamps'), nl, 'lamps');
   bumpIfChanged(document.getElementById('st-sens'), ns, 'sens');
+  // Riepilogo rebind: lampade con AppKey/gruppo legati (nd.grp, stesso flag
+  // del badge "Gruppo OK" per card) sul totale delle lampade. Prima la PWA
+  // non dichiarava da nessuna parte se fossero tutte rebindate, solo un badge
+  // per card dentro il pannello Impostazioni.
+  const lampNodes = lastState.nodes.filter(n => !n.sw && (n.kind & 1));
+  const boundN = lampNodes.filter(n => n.grp).length;
+  const rbEl = document.getElementById('st-rebind');
+  if (rbEl) {
+    const rbBusy = Object.keys(rebindPending).length > 0;
+    rbEl.textContent = !lampNodes.length ? '–' : (rbBusy ? 'in corso...' : `${boundN}/${lampNodes.length}`);
+    rbEl.title = !lampNodes.length ? '' : (boundN === lampNodes.length
+      ? 'Tutte le lampade sono rebindate'
+      : `${lampNodes.length - boundN} lampade da rebindare: ${lampNodes.filter(n => !n.grp).map(n => n.base).join(', ')}`);
+  }
   document.getElementById('st-busy').textContent = lastState.busy ? 'Config...' : 'Pronto';
   document.getElementById('st-busy-box').classList.toggle('busy', !!lastState.busy);
   document.getElementById('badge-busy').style.display = lastState.busy ? '' : 'none';
@@ -1447,7 +1461,7 @@ function renderNode(nd) {
   // Pulsante Impostazioni in linea con #idx/indirizzo/pill di stato (stessa
   // riga node-meta, non piu' una riga propria sotto) - vedi conversazione
   // ("metti in linea il pulsante settings a #1 0x0031 Connesso").
-  const meta = `<div class="node-meta">${settingsPanel}<span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`;
+  const meta = `<div class="node-meta">${settingsPanel}<span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span>${grpBadge}<span class="pill ${stCls}">${stTxt}</span></span></div>`;
 
   return head + meta + body + `</div>`;
 }
