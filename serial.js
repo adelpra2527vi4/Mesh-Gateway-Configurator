@@ -281,7 +281,7 @@ export class GatewaySerial extends EventTarget {
           // Gruppo mesh a cui e' sottoscritto secondo il file importato
           // (0x0000 = nessuno, vedi CFG:IMPORTGROUP/mesh_handler.c).
           grpaddr: fields.grpaddr && fields.grpaddr !== '0x0000' ? fields.grpaddr : null,
-          elems: [], lvls: [], sensor: null, ctl: null, lc: null,
+          elems: [], lvls: [], sensor: null, ctl: null,
         });
         break;
       }
@@ -347,27 +347,6 @@ export class GatewaySerial extends EventTarget {
           haspir: fields.haspir === '1',
           value: Number.isFinite(value) && value >= 0 ? value : null,
         };
-        break;
-      }
-      case 'LCPROP': {
-        // Calibrazione Light LC (occupancy delay, tempi di fade/on/prolong,
-        // lightness on/prolong/standby, soglie di luce ambientale on/
-        // prolong/standby, accuratezza regolatore) - una riga PER
-        // PROPRIETA', non una sola come CFG:CTL/CFG:PIR (vedi node_dump_cb
-        // in mesh_handler.c): si accumulano in node.lc.props{key:value},
-        // "haslc=1" solo se il nodo ha davvero un Light LC Server. Solo le
-        // proprietà già lette almeno una volta arrivano (vedi
-        // lc_calib_known lato firmware): finché mancano, la UI le mostra
-        // come "in lettura...".
-        const node = st.nodes.find(x => x.i === parseInt(fields.node, 10));
-        if (node) {
-          if (!node.lc) node.lc = { haslc: false, props: {} };
-          node.lc.haslc = fields.haslc === '1';
-          const value = parseInt(fields.value, 10);
-          if (fields.key && Number.isFinite(value)) {
-            node.lc.props[fields.key] = value;
-          }
-        }
         break;
       }
       case 'DISCACTIVE': st.discActive = fields.on === 'true'; break;
