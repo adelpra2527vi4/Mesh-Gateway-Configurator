@@ -336,6 +336,19 @@ export class GatewaySerial extends EventTarget {
         };
         break;
       }
+      case 'PIR': {
+        // Sensibilità PIR (Sensor Setting Motion Threshold, 0-100%) - riga
+        // separata da CFG:NODE come CFG:CTL sopra, "haspir=1" solo se il nodo
+        // ha davvero un Sensor Setup Server (vedi node_dump_cb in
+        // mesh_handler.c).
+        const node = st.nodes.find(x => x.i === parseInt(fields.node, 10));
+        const value = parseInt(fields.value, 10);
+        if (node) node.pir = {
+          haspir: fields.haspir === '1',
+          value: Number.isFinite(value) && value >= 0 ? value : null,
+        };
+        break;
+      }
       case 'DISCACTIVE': st.discActive = fields.on === 'true'; break;
       case 'DISCOVERED':
         st.discovered.push({

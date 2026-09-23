@@ -718,6 +718,7 @@ export function setConnected(connected) {
     lastNodeVals = {};
     kindPending = {};
     rebindPending = {};
+    rebindResult = {};
     openSettingsNodes = new Set();
   }
 }
@@ -859,7 +860,41 @@ let kindPending = {}; // { [nd.i]: { combined, until } }
 // Feedback visivo "Rebind in corso..." (vedi renderNode/wireNodeEvents) -
 // stesso schema temporizzato di kindPending, nessuna conferma dedicata dal
 // firmware per un rebind completato.
-let rebindPending = {}; // { [nd.i]: { until } }
+let rebindPending = {}; // { [nd.i]: { since, until, sawBusy, lastBusy } }
+// Esito mostrato per qualche secondo dopo la fine di un rebind, nel pill di
+// stato della card (sempre visibile, non dentro l'ingranaggio Impostazioni).
+let rebindResult = {}; // { [nd.i]: { ok, until } }
+
+// Il firmware risponde CFG:OK;REBIND subito ("accodato"): la riconfigurazione
+// vera (AppKey Add, bind, sottoscrizioni, ~15-25 s per nodo, un nodo alla
+// volta) non ha un evento "fatto". Si deduce dal flag globale CFG:BUSY: il
+// rebind e' finito quando il gateway e' stato visto occupato e poi torna
+// libero da qualche secondo; l'esito (ok/fallito) si legge da cfg/fail del
+// nodo. Rete di sicurezza: scade comunque a `until`.
+function updateRebindProgress() {
+  const now = Date.now();
+
+  for (const i of Object.keys(rebindPending)) {
+    const p = rebindPending[i];
+
+    if (lastState.busy) {
+      p.sawBusy = true;
+      p.lastBusy = now;
+    }
+    const idle = !lastState.busy && p.sawBusy && (now - p.lastBusy) > 3500;
+    const neverStarted = !p.sawBusy && (now - p.since) > 12000;
+
+    if (idle || neverStarted || now > p.until) {
+      const nd = lastState.nodes.find(n => String(n.i) === String(i));
+
+      rebindResult[i] = { ok: !!(nd && nd.cfg && !nd.fail), until: now + 20000 };
+      delete rebindPending[i];
+    }
+  }
+  for (const i of Object.keys(rebindResult)) {
+    if (now > rebindResult[i].until) delete rebindResult[i];
+  }
+}
 // Pannello "Impostazioni" (<details class="node-settings">) aperto da un
 // nodo: renderNodes() ricostruisce l'intero innerHTML ad ogni poll (~2s),
 // quindi un <details> senza stato tracciato a parte torna sempre chiuso al
@@ -880,10 +915,25 @@ function bumpIfChanged(el, newVal, key) {
 }
 
 function renderMesh() {
+  updateRebindProgress();
   const nl = lastState.nodes.filter(n => !n.sw && (n.kind & 1)).length;
   const ns = lastState.nodes.filter(n => !n.sw && (n.kind & 2)).length;
   bumpIfChanged(document.getElementById('st-lamps'), nl, 'lamps');
   bumpIfChanged(document.getElementById('st-sens'), ns, 'sens');
+  // Riepilogo rebind: lampade con AppKey/gruppo legati (nd.grp, stesso flag
+  // del badge "Gruppo OK" per card) sul totale delle lampade. Prima la PWA
+  // non dichiarava da nessuna parte se fossero tutte rebindate, solo un badge
+  // per card dentro il pannello Impostazioni.
+  const lampNodes = lastState.nodes.filter(n => !n.sw && (n.kind & 1));
+  const boundN = lampNodes.filter(n => n.grp).length;
+  const rbEl = document.getElementById('st-rebind');
+  if (rbEl) {
+    const rbBusy = Object.keys(rebindPending).length > 0;
+    rbEl.textContent = !lampNodes.length ? '–' : (rbBusy ? 'in corso...' : `${boundN}/${lampNodes.length}`);
+    rbEl.title = !lampNodes.length ? '' : (boundN === lampNodes.length
+      ? 'Tutte le lampade sono rebindate'
+      : `${lampNodes.length - boundN} lampade da rebindare: ${lampNodes.filter(n => !n.grp).map(n => n.base).join(', ')}`);
+  }
   document.getElementById('st-busy').textContent = lastState.busy ? 'Config...' : 'Pronto';
   document.getElementById('st-busy-box').classList.toggle('busy', !!lastState.busy);
   document.getElementById('badge-busy').style.display = lastState.busy ? '' : 'none';
@@ -1090,7 +1140,43 @@ function renderNodes() {
     try { editingSel = [act.selectionStart, act.selectionEnd]; } catch {}
   }
 
-  box.innerHTML = lastState.nodes.map(renderNode).join('');
+  // Separazione visiva netta per gruppo mesh (richiesta esplicita: prima i
+  // nodi erano tutti in un'unica lista piatta con solo un piccolo badge nome
+  // gruppo per distinguerli). Un'intestazione per ogni gruppo con almeno un
+  // nodo, nell'ordine in cui i gruppi arrivano da CFG:GROUP; i nodi senza
+  // gruppo (nd.grpaddr === null, vedi serial.js) restano in fondo sotto una
+  // loro intestazione dedicata, solo se esistono anche gruppi veri (altrimenti
+  // sarebbe un'intestazione inutile quando non c'e' nessun gruppo importato).
+  const groupsList = lastState.groups || [];
+  const byGroupAddr = new Map();
+  const ungrouped = [];
+  for (const nd of lastState.nodes) {
+    if (nd.grpaddr) {
+      if (!byGroupAddr.has(nd.grpaddr)) byGroupAddr.set(nd.grpaddr, []);
+      byGroupAddr.get(nd.grpaddr).push(nd);
+    } else {
+      ungrouped.push(nd);
+    }
+  }
+  let html = '';
+  for (const g of groupsList) {
+    const nodesInGroup = byGroupAddr.get(g.addr);
+    if (!nodesInGroup || !nodesInGroup.length) continue;
+    html += `<div class="group-header">${(g.name || g.addr).replace(/</g, '&lt;')}</div>`;
+    html += nodesInGroup.map(renderNode).join('');
+    byGroupAddr.delete(g.addr);
+  }
+  // Gruppi con nodi ma assenti da lastState.groups (non dovrebbe succedere,
+  // rete di sicurezza): mostrati comunque con l'indirizzo grezzo come titolo.
+  for (const [addr, nodesInGroup] of byGroupAddr) {
+    html += `<div class="group-header">${addr}</div>`;
+    html += nodesInGroup.map(renderNode).join('');
+  }
+  if (ungrouped.length) {
+    if (html) html += `<div class="group-header muted">Senza gruppo</div>`;
+    html += ungrouped.map(renderNode).join('');
+  }
+  box.innerHTML = html;
   wireNodeEvents(box);
 
   if (editingId) {
@@ -1127,8 +1213,19 @@ function renderNode(nd) {
   }
 
   const offline = nd.cfg && !nd.online;
-  const stCls = offline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
-  const stTxt = offline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
+  let stCls = offline ? 'err' : (nd.cfg ? 'ok' : (nd.fail ? 'err' : 'wait'));
+  let stTxt = offline ? 'Disconnesso' : (nd.cfg ? 'Connesso' : (nd.fail ? 'Errore' : 'Config...'));
+  // Stato del rebind nel pill sempre visibile della card (prima era solo nel
+  // pulsante dentro il pannello Impostazioni, per 8 s): "in coda/in corso"
+  // finche' il gateway lavora, poi l'esito per qualche secondo - vedi
+  // updateRebindProgress().
+  if (rebindPending[nd.i]) {
+    stCls = 'wait';
+    stTxt = 'Rebind in corso...';
+  } else if (rebindResult[nd.i]) {
+    stCls = rebindResult[nd.i].ok ? 'ok' : 'err';
+    stTxt = rebindResult[nd.i].ok ? 'Rebind completato' : 'Rebind fallito';
+  }
   // "kind" e' una bitmask (1=lampada, 2=sensore, 3=entrambi), non piu' una
   // scelta esclusiva: un device combo (es. dongle SR con 2 LED + PIR/LUX)
   // puo' avere entrambe le capacita' gestite insieme, ognuna con le sue
@@ -1374,6 +1471,19 @@ function renderNode(nd) {
           <input type="range" min="${CTL_MIN}" max="${CTL_MAX}" step="50" value="${tempK}" style="--p:${ctlPct}" class="slider ctl-slider"
                  id="ctl_${nd.i}" data-act="ctl-input" data-node="${nd.i}" data-ctl-min="${CTL_MIN}" data-ctl-max="${CTL_MAX}"></div>`;
       }
+      // Sensibilità PIR (Sensor Setting Motion Threshold) - stesso schema
+      // "nascondi se il device non supporta" di hasctl/hassens sopra: solo
+      // se il nodo ha davvero un Sensor Setup Server (nd.pir.haspir).
+      if (nd.pir && nd.pir.haspir) {
+        const pirVal = nd.pir.value !== null ? nd.pir.value : 50;
+        const pirKey = nd.i;
+        const lastPir = lastNodeVals[`pir-${pirKey}`]?.value;
+        const pirBump = lastPir !== undefined && lastPir !== pirVal ? ' animate-value-bump' : '';
+        lastNodeVals[`pir-${pirKey}`] = { value: pirVal };
+        cards += `<div class="card"><div class="elem-title">Sensibilit&agrave; PIR<span class="pctlbl${pirBump}" data-pir-label="${nd.i}">${pirVal}%</span></div>
+          <input type="range" min="0" max="100" value="${pirVal}" class="slider" style="--p:${pirVal}"
+                 id="pir_${nd.i}" data-act="pir-input" data-node="${nd.i}"></div>`;
+      }
       cards += `</div>`;
       body += cards;
     }
@@ -1400,7 +1510,7 @@ function renderNode(nd) {
   // Pulsante Impostazioni in linea con #idx/indirizzo/pill di stato (stessa
   // riga node-meta, non piu' una riga propria sotto) - vedi conversazione
   // ("metti in linea il pulsante settings a #1 0x0031 Connesso").
-  const meta = `<div class="node-meta">${settingsPanel}<span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span><span class="pill ${stCls}">${stTxt}</span></span></div>`;
+  const meta = `<div class="node-meta">${settingsPanel}<span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="node-id"><span class="idx">#${nd.i}</span><span class="addr">${nd.base}</span></span>${grpBadge}<span class="pill ${stCls}">${stTxt}</span></span></div>`;
 
   return head + meta + body + `</div>`;
 }
@@ -1462,8 +1572,16 @@ function wireNodeEvents(box) {
       // avrebbe subito cancellato un semplice el.disabled/el.textContent
       // messo qui. Finestra di 8s: copre i retry interni del firmware
       // (MESH_CFG_MAX_ATTEMPTS) su un link marginale.
-      rebindPending[el.dataset.node] = { until: Date.now() + 8000 };
+      // Il tempo massimo e' lungo (2 min) perche' i rebind sono accodati e il
+      // gateway ne fa uno alla volta: la fine vera la decide
+      // updateRebindProgress() da CFG:BUSY, questa scadenza e' solo la rete
+      // di sicurezza.
+      delete rebindResult[el.dataset.node];
+      rebindPending[el.dataset.node] = {
+        since: Date.now(), until: Date.now() + 120000, sawBusy: false, lastBusy: 0,
+      };
       api.sendCmd(`CFG:REBIND;node=${el.dataset.node}`);
+      api.afterCmdRefresh();
     });
   });
   box.querySelectorAll('[data-act="forget"]').forEach(el => {
@@ -1520,6 +1638,23 @@ function wireNodeEvents(box) {
       const next = Math.min(6500, Math.max(2700, parseInt(el.value, 10) + step));
       el.value = next; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change'));
       clearTimeout(ctlWheelDebounce); ctlWheelDebounce = setTimeout(sendCtl, 200);
+    }, { passive: false });
+  });
+  box.querySelectorAll('[data-act="pir-input"]').forEach(el => {
+    // Stesso schema esatto dello slider luminosita' (level-input): label
+    // live durante il drag, invio CFG:SETPIRSENS solo su "change" (rilascio).
+    const label = box.querySelector(`[data-pir-label="${el.dataset.node}"]`);
+    const sendPir = () => { api.sendCmd(`CFG:SETPIRSENS;node=${el.dataset.node};value=${el.value}`); api.afterCmdRefresh(); };
+    el.addEventListener('input', () => { if (label) label.textContent = el.value + '%'; el.style.setProperty('--p', el.value); });
+    el.addEventListener('change', sendPir);
+    let pirWheelDebounce = null;
+    el.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (document.activeElement !== el) el.focus();
+      const step = e.deltaY < 0 ? 1 : -1;
+      const next = Math.min(100, Math.max(0, parseInt(el.value, 10) + step));
+      el.value = next; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change'));
+      clearTimeout(pirWheelDebounce); pirWheelDebounce = setTimeout(sendPir, 200);
     }, { passive: false });
   });
   box.querySelectorAll('[data-act="qrscan"]').forEach(el => {

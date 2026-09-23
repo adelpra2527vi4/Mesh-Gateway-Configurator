@@ -210,6 +210,9 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:5px
 #banner{display:none;flex:1;min-width:160px;border:1px solid var(--red);background:color-mix(in srgb,var(--red) 12%,var(--surface));color:var(--red);padding:7px 13px;border-radius:11px;font-weight:600;font-size:.82rem;margin:0}
 #savemsg{font-size:.85rem;color:var(--muted)}
 
+.group-header{font-size:.95rem;font-weight:700;color:var(--text);margin:22px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--accent, var(--border))}
+.group-header:first-child{margin-top:0}
+.group-header.muted{color:var(--muted);border-bottom-color:var(--border);font-weight:600}
 .node{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius);padding:14px;margin:0 0 14px;box-shadow:var(--shadow)}
 .node-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
 .node-head .idx{font-size:.78rem;color:var(--muted);font-weight:600}
