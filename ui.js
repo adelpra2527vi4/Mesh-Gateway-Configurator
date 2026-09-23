@@ -6,6 +6,34 @@
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
 let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
 
+// Proprietà di calibrazione Light LC (vedi CFG:LCPROP/CFG:SETLCPROP,
+// mesh_handler.c lc_calib_props[]) - stessi parametri esposti dall'app
+// MeshProv come "calibrazione" di una lampada (tempi di fade/on/prolong,
+// occupancy delay, lightness on/prolong/standby, soglie di luce ambientale
+// on/prolong/standby, accuratezza regolatore). "factor" converte il valore
+// intero del protocollo CFG (già nell'unità di visualizzazione del
+// firmware, vedi lc_calib_micro_to_display) nel valore mostrato/modificabile
+// qui: display = raw/factor, raw = round(display*factor). I tempi arrivano
+// in millisecondi dal firmware ma si mostrano in secondi (factor 1000), i
+// lux arrivano già moltiplicati per 100 (factor 100), lightness/percento
+// sono già l'unità giusta (factor 1).
+const LC_CALIB_FIELDS = [
+  { key: 'occdelay', label: 'Ritardo accensione (PIR)', group: 'Tempi', unit: 's', factor: 1000, step: 0.1, min: 0 },
+  { key: 'fadeon', label: 'Fade verso ON', group: 'Tempi', unit: 's', factor: 1000, step: 0.1, min: 0 },
+  { key: 'timeon', label: 'Tempo in ON', group: 'Tempi', unit: 's', factor: 1000, step: 1, min: 0 },
+  { key: 'fadeprolong', label: 'Fade verso Prolong', group: 'Tempi', unit: 's', factor: 1000, step: 0.1, min: 0 },
+  { key: 'timeprolong', label: 'Tempo in Prolong', group: 'Tempi', unit: 's', factor: 1000, step: 1, min: 0 },
+  { key: 'fadestandbyauto', label: 'Fade verso Standby (auto)', group: 'Tempi', unit: 's', factor: 1000, step: 0.1, min: 0 },
+  { key: 'fadestandbymanual', label: 'Fade verso Standby (manuale)', group: 'Tempi', unit: 's', factor: 1000, step: 0.1, min: 0 },
+  { key: 'lightnesson', label: 'Luminosità ON', group: 'Luminosità', unit: '', factor: 1, step: 1, min: 0, max: 65535 },
+  { key: 'lightnessprolong', label: 'Luminosità Prolong', group: 'Luminosità', unit: '', factor: 1, step: 1, min: 0, max: 65535 },
+  { key: 'lightnessstandby', label: 'Luminosità Standby', group: 'Luminosità', unit: '', factor: 1, step: 1, min: 0, max: 65535 },
+  { key: 'luxon', label: 'Soglia luce ON', group: 'Luce ambiente', unit: 'lux', factor: 100, step: 0.5, min: 0 },
+  { key: 'luxprolong', label: 'Soglia luce Prolong', group: 'Luce ambiente', unit: 'lux', factor: 100, step: 0.5, min: 0 },
+  { key: 'luxstandby', label: 'Soglia luce Standby', group: 'Luce ambiente', unit: 'lux', factor: 100, step: 0.5, min: 0 },
+  { key: 'regaccuracy', label: 'Accuratezza regolatore', group: 'Regolatore', unit: '%', factor: 1, step: 1, min: 0, max: 100 },
+];
+
 // La barretta di un gruppo deve rappresentare lo stato MEDIO reale delle
 // lampade sottoscritte, non un valore locale finto (un primo tentativo
 // teneva solo l'ultimo valore impostato dall'utente, resettato a 100/0 nei
@@ -1317,6 +1345,11 @@ function renderNode(nd) {
   // nd.cfg, ma il pannello Impostazioni si costruisce comunque anche per
   // un nodo non ancora configurato (kindPicker/Rebind restano utili).
   let calibCard = '';
+  // lcCalibCard: stesso ruolo di calibCard sopra ma per la calibrazione
+  // Light LC (vedi LC_CALIB_FIELDS/wireNodeEvents "lcprop-input" sotto) -
+  // equivalente delle proprietà che l'app MeshProv espone come slider di
+  // calibrazione di una lampada.
+  let lcCalibCard = '';
 
   if (!nd.cfg) {
     body = `<div class="empty" style="margin-top:10px">Non ancora configurato.</div>`;
@@ -1484,6 +1517,45 @@ function renderNode(nd) {
           <input type="range" min="0" max="100" value="${pirVal}" class="slider" style="--p:${pirVal}"
                  id="pir_${nd.i}" data-act="pir-input" data-node="${nd.i}"></div>`;
       }
+      // Calibrazione Light LC - card a parte nel pannello Impostazioni
+      // (come calibCard/Lux sopra), non nel body operativo: 14 campi sono
+      // troppi per restare sempre visibili accanto a on/off/luminosità -
+      // vedi conversazione ("miglioriamo... e anche calibrazioni come
+      // l'app"). Mostrata solo se il nodo ha davvero un Light LC Server
+      // (nd.lc.haslc, vedi node_dump_cb in mesh_handler.c).
+      if (nd.lc && nd.lc.haslc) {
+        const usbLock = !lastState.usbMode ? ' usb-locked' : '';
+        const groups = [];
+        for (const f of LC_CALIB_FIELDS) {
+          let g = groups.find((x) => x.name === f.group);
+          if (!g) { g = { name: f.group, fields: [] }; groups.push(g); }
+          g.fields.push(f);
+        }
+        let fieldsHtml = '';
+        for (const g of groups) {
+          fieldsHtml += `<div class="lc-calib-group"><div class="muted" style="font-size:.84em;margin:8px 0 4px">${g.name}</div>`;
+          for (const f of g.fields) {
+            const raw = nd.lc.props[f.key];
+            const known = raw !== undefined;
+            const displayVal = known ? (raw / f.factor) : '';
+            fieldsHtml += `<div class="lc-calib-row" style="display:flex;align-items:center;gap:6px;margin:4px 0">
+              <span style="flex:1 1 auto;font-size:.9em">${f.label}</span>
+              <input type="number" inputmode="decimal" style="width:80px" step="${f.step}"
+                     ${f.min !== undefined ? `min="${f.min}"` : ''} ${f.max !== undefined ? `max="${f.max}"` : ''}
+                     placeholder="${known ? '' : 'in lettura...'}" value="${known ? displayVal : ''}"
+                     data-act="lcprop-input" data-node="${nd.i}" data-key="${f.key}" data-factor="${f.factor}">
+              <span class="muted" style="font-size:.84em;width:26px">${f.unit}</span>
+            </div>`;
+          }
+          fieldsHtml += `</div>`;
+        }
+        lcCalibCard = `<div class="card${usbLock}">
+          <div class="elem-title">Calibrazione Light LC
+            <button class="btn sm" data-act="lc-refresh" data-node="${nd.i}" style="margin-left:8px">Rileggi</button>
+          </div>
+          ${fieldsHtml}
+        </div>`;
+      }
       cards += `</div>`;
       body += cards;
     }
@@ -1504,6 +1576,7 @@ function renderNode(nd) {
     (rbtn || grpBadge) ? `<div class="card">${rbtn} ${grpBadge}</div>` : '',
     companion,
     calibCard,
+    lcCalibCard,
   ].filter(Boolean).join('');
   const isOpen = openSettingsNodes.has(nd.i) ? ' open' : '';
   const settingsPanel = `<details class="node-settings" id="settings_${nd.i}" data-node="${nd.i}"${isOpen}><summary>${gearIcon}Impostazioni</summary><div class="node-settings-body cards">${settingsCards}</div></details>`;
@@ -1656,6 +1729,25 @@ function wireNodeEvents(box) {
       el.value = next; el.dispatchEvent(new Event('input')); el.dispatchEvent(new Event('change'));
       clearTimeout(pirWheelDebounce); pirWheelDebounce = setTimeout(sendPir, 200);
     }, { passive: false });
+  });
+  // Calibrazione Light LC: campi numerici, non slider (14 proprietà con
+  // range molto diversi tra loro - tempi in secondi, lightness 0-65535,
+  // lux, percento - uno slider unico per tutti non avrebbe senso). Invio
+  // solo su "change" (blur/invio), come gli altri campi numerici della PWA
+  // (es. il lux di riferimento della calibrazione lux sopra), non ad ogni
+  // tasto premuto.
+  box.querySelectorAll('[data-act="lcprop-input"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const raw = parseFloat(el.value);
+      if (!Number.isFinite(raw)) return;
+      const factor = parseFloat(el.dataset.factor) || 1;
+      const value = Math.round(raw * factor);
+      api.sendCmd(`CFG:SETLCPROP;node=${el.dataset.node};key=${el.dataset.key};value=${value}`);
+      api.afterCmdRefresh();
+    });
+  });
+  box.querySelectorAll('[data-act="lc-refresh"]').forEach(el => {
+    el.addEventListener('click', () => { api.sendCmd(`CFG:LCREFRESH;node=${el.dataset.node}`); api.afterCmdRefresh(); });
   });
   box.querySelectorAll('[data-act="qrscan"]').forEach(el => {
     el.addEventListener('click', () => openQrScanner('pq_' + el.dataset.node));
