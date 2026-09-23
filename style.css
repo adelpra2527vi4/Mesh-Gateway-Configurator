@@ -571,6 +571,7 @@ details[open] summary::before{content:'\25BE '}
 #discovered-box, #nodes-box, .cards-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
 @media (max-width:760px){ #discovered-box, #nodes-box, .cards-grid{grid-template-columns:1fr} }
 #discovered-box .section-title, #nodes-box .section-title{grid-column:1/-1}
+#nodes-box .group-header{grid-column:1/-1}
 .node,.dev-card{margin:0}
 /* Distacco netto tra "rilevati" e "gia' provisionati": il primo box non ha
    piu' bisogno di margine sotto (lo da' il titolo del secondo). */
