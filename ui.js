@@ -1371,7 +1371,27 @@ function renderNode(nd) {
       const energyCard = (hasLampKind && s && s.energyWh != null)
         ? `<div class="card"><div class="elem-title">Energia</div><div class="pctlbl" style="margin-top:6px">${s.energyWh} Wh</div></div>`
         : '';
-      const anySensorCard = presCard || luxCard || powerCard || energyCard;
+      // Sensibilità PIR (Sensor Setting Motion Threshold) - PRIMA era
+      // annidata dentro il blocco "if (hasLampKind)" più sotto, quindi non
+      // compariva mai per un nodo sensore puro (kind solo NODE_KIND_SENSOR,
+      // senza bit lampada) - vedi conversazione ("rebind fatto ma non
+      // appare... i sensori pir+lux non hanno né sensibilità pir né
+      // calibrazione lux"). Dipende solo da nd.pir.haspir (Sensor Setup
+      // Server), non dal kind del nodo: va quindi qui, nello stesso blocco
+      // di presCard/luxCard/calibCard sopra, raggiungibile sia da lampade
+      // che da sensori puri.
+      let pirCard = '';
+      if (nd.pir && nd.pir.haspir) {
+        const pirVal = nd.pir.value !== null ? nd.pir.value : 50;
+        const lastPir = lastNodeVals[`pir-${nd.i}`]?.value;
+        const pirBump = lastPir !== undefined && lastPir !== pirVal ? ' animate-value-bump' : '';
+        lastNodeVals[`pir-${nd.i}`] = { value: pirVal };
+        pirCard = `<div class="card"><div class="elem-title">Sensibilit&agrave; PIR<span class="pctlbl${pirBump}" data-pir-label="${nd.i}">${pirVal}%</span></div>
+          <input type="range" min="0" max="100" value="${pirVal}" class="slider" style="--p:${pirVal}"
+                 id="pir_${nd.i}" data-act="pir-input" data-node="${nd.i}"></div>`;
+      }
+
+      const anySensorCard = presCard || luxCard || powerCard || energyCard || pirCard;
       const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>`
         : (!anySensorCard ? `<div class="addr" style="margin-top:8px">(in attesa di dati dal sensore...)</div>` : '');
 
@@ -1411,7 +1431,7 @@ function renderNode(nd) {
       }
 
       if (anySensorCard) {
-        body += `<div class="cards">${presCard}${luxCard}${powerCard}${energyCard}</div>${warn}`;
+        body += `<div class="cards">${presCard}${luxCard}${powerCard}${energyCard}${pirCard}</div>${warn}`;
       } else {
         body += warn;
       }
@@ -1479,19 +1499,6 @@ function renderNode(nd) {
         cards += `<div class="card"><div class="elem-title">Colore<span class="pctlbl${ctlBump}" data-ctl-label="${nd.i}">${tempK}K</span></div>
           <input type="range" min="${CTL_MIN}" max="${CTL_MAX}" step="50" value="${tempK}" style="--p:${ctlPct}" class="slider ctl-slider"
                  id="ctl_${nd.i}" data-act="ctl-input" data-node="${nd.i}" data-ctl-min="${CTL_MIN}" data-ctl-max="${CTL_MAX}"></div>`;
-      }
-      // Sensibilità PIR (Sensor Setting Motion Threshold) - stesso schema
-      // "nascondi se il device non supporta" di hasctl/hassens sopra: solo
-      // se il nodo ha davvero un Sensor Setup Server (nd.pir.haspir).
-      if (nd.pir && nd.pir.haspir) {
-        const pirVal = nd.pir.value !== null ? nd.pir.value : 50;
-        const pirKey = nd.i;
-        const lastPir = lastNodeVals[`pir-${pirKey}`]?.value;
-        const pirBump = lastPir !== undefined && lastPir !== pirVal ? ' animate-value-bump' : '';
-        lastNodeVals[`pir-${pirKey}`] = { value: pirVal };
-        cards += `<div class="card"><div class="elem-title">Sensibilit&agrave; PIR<span class="pctlbl${pirBump}" data-pir-label="${nd.i}">${pirVal}%</span></div>
-          <input type="range" min="0" max="100" value="${pirVal}" class="slider" style="--p:${pirVal}"
-                 id="pir_${nd.i}" data-act="pir-input" data-node="${nd.i}"></div>`;
       }
       cards += `</div>`;
       body += cards;
