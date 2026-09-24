@@ -1376,12 +1376,22 @@ function renderNode(nd) {
       // compariva mai per un nodo sensore puro (kind solo NODE_KIND_SENSOR,
       // senza bit lampada) - vedi conversazione ("rebind fatto ma non
       // appare... i sensori pir+lux non hanno né sensibilità pir né
-      // calibrazione lux"). Dipende solo da nd.pir.haspir (Sensor Setup
-      // Server), non dal kind del nodo: va quindi qui, nello stesso blocco
-      // di presCard/luxCard/calibCard sopra, raggiungibile sia da lampade
-      // che da sensori puri.
+      // calibrazione lux"). Va quindi qui, nello stesso blocco di
+      // presCard/luxCard/calibCard sopra, raggiungibile sia da lampade che
+      // da sensori puri.
+      //
+      // Gate su presCard (non solo su nd.pir.haspir): "haspir" dice solo
+      // che il nodo ha UN Sensor Setup Server, ma alcune lampade/driver DALI
+      // ne hanno uno solo per la calibrazione lux (luce ambiente per il
+      // dimming automatico), senza alcun sensore di presenza reale - senza
+      // questo controllo lo slider Sensibilità PIR compariva anche lì,
+      // scrivendo un Motion Threshold che il device non usa per nulla -
+      // vedi conversazione ("le lampade hanno ancora sensibilità pir").
+      // presCard e' vuota finche' il device non ha risposto almeno una
+      // volta con un valore di presenza reale (s.pres != null), stesso
+      // schema "nascondi finche' non confermato" gia' usato per luxCard.
       let pirCard = '';
-      if (nd.pir && nd.pir.haspir) {
+      if (presCard && nd.pir && nd.pir.haspir) {
         const pirVal = nd.pir.value !== null ? nd.pir.value : 50;
         const lastPir = lastNodeVals[`pir-${nd.i}`]?.value;
         const pirBump = lastPir !== undefined && lastPir !== pirVal ? ' animate-value-bump' : '';
