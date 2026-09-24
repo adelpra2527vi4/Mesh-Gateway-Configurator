@@ -1274,7 +1274,13 @@ function renderNode(nd) {
   if (rbPending && !rbLive) {
     delete rebindPending[nd.i];
   }
-  const rbtn = hasLampKind
+  // Il rebind lato firmware (mesh_handler_node_rebind) rifà la Composition
+  // Data Get/AppKey Add/Model Bind per QUALSIASI nodo, non solo le lampade -
+  // era limitato a hasLampKind qui in PWA senza motivo, il che impediva di
+  // rebindare un sensore per fargli (ri)scoprire un Sensor Setup Server
+  // aggiunto al parsing dopo che il nodo era già configurato (vedi
+  // conversazione: "rebind lo hanno solo le lampade, non i sensori").
+  const rbtn = (hasLampKind || hasSensorKind)
     ? `<button class="btn sm" data-act="rebind" data-node="${nd.i}" ${rbLive ? 'disabled' : ''}>${rbLive ? 'Rebind in corso...' : 'Rebind'}</button>`
     : '';
   // Companion switch: calcolato qui (non piu' in fondo dentro lampBlock)
