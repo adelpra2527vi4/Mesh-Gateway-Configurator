@@ -281,7 +281,7 @@ export class GatewaySerial extends EventTarget {
           // Gruppo mesh a cui e' sottoscritto secondo il file importato
           // (0x0000 = nessuno, vedi CFG:IMPORTGROUP/mesh_handler.c).
           grpaddr: fields.grpaddr && fields.grpaddr !== '0x0000' ? fields.grpaddr : null,
-          elems: [], lvls: [], sensor: null, ctl: null,
+          elems: [], lvls: [], sensor: null, ctl: null, luxcalib: null,
         });
         break;
       }
@@ -346,6 +346,20 @@ export class GatewaySerial extends EventTarget {
         if (node) node.pir = {
           haspir: fields.haspir === '1',
           value: Number.isFinite(value) && value >= 0 ? value : null,
+        };
+        break;
+      }
+      case 'LUXCALIB': {
+        // Calibrazione lux reale (Present Ambient Light Level scritto
+        // direttamente nel sensore, come fa l'app MeshProv/Silvair - vedi
+        // CFG:SETLUXCALIB/node_dump_cb in mesh_handler.c). ref_x100=-1 =
+        // mai calibrato. "haslux=1" solo se il nodo ha un Sensor Setup
+        // Server (stesso requisito di CFG:PIR).
+        const node = st.nodes.find(x => x.i === parseInt(fields.node, 10));
+        const refX100 = parseInt(fields.ref_x100, 10);
+        if (node) node.luxcalib = {
+          haslux: fields.haslux === '1',
+          ref_x100: Number.isFinite(refX100) && refX100 >= 0 ? refX100 : null,
         };
         break;
       }

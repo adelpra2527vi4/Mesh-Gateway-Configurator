@@ -293,13 +293,14 @@ function openQrScanner(targetInputId) {
     .catch(() => { status.textContent = 'Fotocamera non disponibile o permesso negato.'; });
 }
 
-// Calibrazione lux: rawLux live per nodo (aggiornato dai push SENSOR)
+// rawLux live per nodo (aggiornato dai push SENSOR) - solo per mostrare la
+// lettura più fresca nella card "Luce ambiente" tra un poll e l'altro. La
+// calibrazione lux NON usa più questo valore: scrive il riferimento
+// direttamente nel sensore (CFG:SETLUXCALIB;lux_x100=..., vedi
+// mesh_handler_node_set_luxcalib) invece di calcolare un fattore locale
+// raw/riferimento come faceva la vecchia calibrazione "cosmetica" - vedi
+// conversazione ("manca ancora la calibrazione lux come avviene in app").
 let luxRawLive = {}; // { nodeI: float }
-
-function loadLuxCalib() { try { return JSON.parse(localStorage.getItem('lux_calib') || '{}'); } catch { return {}; } }
-function saveLuxCalib(d) { localStorage.setItem('lux_calib', JSON.stringify(d)); }
-function getNodeCalib(nodeI) { return loadLuxCalib()[String(nodeI)] || null; }
-function clearNodeCalib(nodeI) { const a = loadLuxCalib(); delete a[String(nodeI)]; saveLuxCalib(a); }
 
 // Usato da app.js per rallentare il polling durante il provisioning.
 export function getLastStateBusy() { return !!lastState.busy; }
@@ -1368,35 +1369,37 @@ function renderNode(nd) {
       const warn = !s || !s.hassens ? `<div class="addr" style="margin-top:8px">(nessun Sensor Server su questo device)</div>`
         : (!anySensorCard ? `<div class="addr" style="margin-top:8px">(in attesa di dati dal sensore...)</div>` : '');
 
-      // Il firmware applica un fattore moltiplicativo per nodo (sensor_light_cal
-      // in main.c: calibrato = grezzo * fattore / 1000) - un offset additivo
-      // provato prima lasciava il buio (grezzo=0) diverso da 0 dopo calibrazione,
-      // sbagliato per definizione - vedi conversazione. Vedi CFG:SETLUXCALIB.
-      // Calibrazione lux: ha senso solo se questo device conferma davvero
-      // il supporto lux (luxCard non vuota) - su un device solo
-      // potenza/energia la card resterebbe una funzione morta per sempre.
-      if (luxCard) {
-        const calib = getNodeCalib(nd.i);
-        const calibSummary = calib && calib.factor_1000
-          ? `<span class="badge good">Calibrato</span> &times;${(calib.factor_1000/1000).toFixed(3)} (rif: ${calib.ref_lux||'?'} lux)`
+      // Calibrazione lux reale (come fa l'app MeshProv/Silvair - vedi
+      // conversazione): scrive il valore letto da un luxmetro esterno
+      // DIRETTAMENTE nel sensore via Sensor Setting Set sulla proprietà
+      // Present Ambient Light Level (CFG:SETLUXCALIB;lux_x100=...), non un
+      // fattore calcolato qui in JS come la vecchia calibrazione locale
+      // (mai vista dal resto della mesh). Richiede lo stesso Sensor Setup
+      // Server della sensibilità PIR (nd.luxcalib.haslux, vedi node_dump_cb
+      // in mesh_handler.c), non solo che il device confermi il supporto
+      // lux (luxCard) - un device senza Sensor Setup Server può comunque
+      // riportare lux ma non accettare la scrittura del valore.
+      if (luxCard && nd.luxcalib && nd.luxcalib.haslux) {
+        const refKnown = nd.luxcalib.ref_x100 !== null;
+        const calibSummary = refKnown
+          ? `<span class="badge good">Calibrato</span> (rif: ${(nd.luxcalib.ref_x100/100).toFixed(2)} lux)`
           : `<span class="badge warn">Non calibrato</span>`;
         const usbLock = !lastState.usbMode ? ' usb-locked' : '';
         // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
-        const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? (calib?.ref_lux || '');
+        const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? '';
 
         calibCard = `<div class="card${usbLock}">
         <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
-        <div style="margin:6px 0">
-          <button class="btn sm danger" data-act="calib-zero" data-node="${nd.i}">Azzera calibrazione</button>
-          <span class="muted" style="font-size:0.84em">(passo obbligatorio prima di ri-calibrare, cosi' la lettura attuale torna grezza)</span>
-        </div>
-        <hr style="margin:10px 0;opacity:.3">
         <div style="margin:8px 0">
-          Dopo aver azzerato e atteso una nuova lettura, confronta con un luxmetro di riferimento
-          e inserisci qui i lux letti dallo strumento:
-          <input type="text" inputmode="numeric" id="cref-${nd.i}" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
-          <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra e invia</button>
-          <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
+          Confronta la lettura attuale con un luxmetro di riferimento e inserisci
+          qui il valore reale letto dallo strumento: il sensore verrà corretto
+          direttamente, cosi' anche le altre app/lampade sulla mesh vedranno il
+          valore giusto.
+          <div style="margin-top:6px">
+            <input type="text" inputmode="decimal" id="cref-${nd.i}" style="width:80px;margin:0 4px" value="${refLuxCurrentVal}"> lux
+            <button class="btn sm primary" data-act="calib-save" data-node="${nd.i}">Calibra il sensore</button>
+            <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
+          </div>
         </div>
       </div>`;
       }
@@ -1672,38 +1675,22 @@ function wireNodeEvents(box) {
     el.addEventListener('click', () => { if (confirm('Scollegare il companion?')) api.sendCmd(`CFG:UNPAIR;node=${el.dataset.node}`); });
   });
 
-  // Calibrazione Lux — azzera (factor=0 → sentinella "non calibrato", il
-  // firmware torna a riportare il valore grezzo del sensore)
-  box.querySelectorAll('[data-act="calib-zero"]').forEach(el => {
-    el.addEventListener('click', () => {
-      const ni = parseInt(el.dataset.node);
-      if (!confirm('Azzerare la calibrazione lux per questo sensore?')) return;
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=0`);
-      clearNodeCalib(ni);
-      renderMesh();
-    });
-  });
-
-  // Calibrazione Lux — calcola il fattore moltiplicativo e invia
-  // CFG:SETLUXCALIB. Va azzerato prima (bottone sopra) cosi' la lettura
-  // corrente e' il valore grezzo, non uno gia' calibrato col fattore vecchio.
+  // Calibrazione Lux reale (come l'app MeshProv/Silvair): manda il valore
+  // di riferimento direttamente al sensore via CFG:SETLUXCALIB, nessun
+  // calcolo qui - il firmware scrive il valore nel Sensor Setup Server
+  // (Present Ambient Light Level) e la conferma arriva nel prossimo
+  // CFG:STATE (nd.luxcalib.ref_x100, vedi serial.js).
   box.querySelectorAll('[data-act="calib-save"]').forEach(el => {
     el.addEventListener('click', () => {
       const ni = parseInt(el.dataset.node);
       const refInput = document.getElementById(`cref-${ni}`);
       const ref_lux = parseFloat(refInput?.value);
-      if (isNaN(ref_lux) || ref_lux <= 0) { alert('Inserisci un valore lux valido (> 0).'); return; }
-      const cur = luxRawLive[ni];
-      if (cur === undefined) { alert('Nessuna lettura lux disponibile. Attendi il prossimo aggiornamento dal sensore.'); return; }
-      if (cur <= 0) { alert(`La lettura attuale (${cur.toFixed(2)} lux) e' zero o negativa: non posso calcolare un fattore da qui. Assicurati che il sensore sia sotto illuminazione sufficiente e non appena azzerato.`); return; }
-      const factor_1000 = Math.round((ref_lux / cur) * 1000);
-      const all = loadLuxCalib();
-      all[String(ni)] = { factor_1000, ref_lux };
-      saveLuxCalib(all);
-      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};factor=${factor_1000}`);
+      if (isNaN(ref_lux) || ref_lux < 0) { alert('Inserisci un valore lux valido (>= 0).'); return; }
+      const lux_x100 = Math.round(ref_lux * 100);
+      api.sendCmd(`CFG:SETLUXCALIB;node=${ni};lux_x100=${lux_x100}`);
       const msg = document.getElementById(`csm-${ni}`);
-      if (msg) msg.textContent = `Inviato: ×${(factor_1000/1000).toFixed(3)}`;
-      renderMesh();
+      if (msg) msg.textContent = 'Inviato, in attesa di conferma dal sensore...';
+      api.afterCmdRefresh();
     });
   });
 }
