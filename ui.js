@@ -4,7 +4,7 @@
 // protocollo a righe CFG: invece che su fetch+JSON.
 
 let api = null; // { sendCmd, afterCmdRefresh, afterStatusRefresh, startSnifferPoll, stopSnifferPoll, gw }
-let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false };
+let lastState  = { busy: false, oob: false, usbMode: false, nodes: [], discovered: [], discActive: false, autocalib: { busy: false, result: -2, sensorAddr: null } };
 
 // La barretta di un gruppo deve rappresentare lo stato MEDIO reale delle
 // lampade sottoscritte, non un valore locale finto (un primo tentativo
@@ -1424,6 +1424,41 @@ function renderNode(nd) {
         // Preserva il valore che l'utente sta digitando nel campo lux di riferimento
         const refLuxCurrentVal = document.getElementById(`cref-${nd.i}`)?.value ?? '';
 
+        // Misura automatica (come "Misura automatica" nell'app MeshProv/
+        // Silvair - vedi conversazione): pilota le lampade dello STESSO
+        // gruppo mesh di questo sensore su 4 livelli mentre legge il
+        // sensore, poi ricalibra i target Light LC delle lampade - non
+        // tocca il sensore (quello lo fa solo la calibrazione manuale
+        // sopra). Richiede che il sensore sia in un gruppo con almeno una
+        // lampada, altrimenti il gateway non saprebbe quali lampade
+        // pilotare (nessun concetto di "lampade associate" lato firmware,
+        // lo decide la PWA qui). ~20s totali (4 step x ~4.2s + margini).
+        const groupLamps = nd.grpaddr
+          ? lastState.nodes.filter((n) => n.grpaddr === nd.grpaddr && (n.kind & 1))
+          : [];
+        const ac = lastState.autocalib || { busy: false, result: -2 };
+        const acBusy = !!ac.busy;
+        let autoSection;
+
+        if (!nd.grpaddr || groupLamps.length === 0) {
+          autoSection = `<div class="muted" style="font-size:0.84em">Misura automatica non disponibile: questo sensore non è in un gruppo con lampade.</div>`;
+        } else {
+          const resultBadge = acBusy
+            ? `<span class="badge warn">In corso... (~20s)</span>`
+            : ac.result === 1 ? `<span class="badge good">Ultima misura riuscita</span>`
+            : ac.result === -1 ? `<span class="badge warn">Ultima misura fallita</span>` : '';
+          autoSection = `<div>
+            Oppure pilota automaticamente le ${groupLamps.length} lampade del gruppo
+            "${lastState.groups.find((g) => g.addr === nd.grpaddr)?.name || nd.grpaddr}"
+            su 4 livelli per ricalibrare i loro target Light LC dal sensore reale
+            (nessun luxmetro necessario, ma non calibra il sensore stesso).
+            <div style="margin-top:6px">
+              <button class="btn sm" data-act="lux-autocalib" data-node="${nd.i}" data-grpaddr="${nd.grpaddr}" ${acBusy ? 'disabled' : ''}>${acBusy ? 'Misura in corso...' : 'Misura automatica'}</button>
+              ${resultBadge}
+            </div>
+          </div>`;
+        }
+
         calibCard = `<div class="card${usbLock}">
         <div class="elem-title">Calibrazione Lux &nbsp; ${calibSummary}</div>
         <div style="margin:8px 0">
@@ -1437,6 +1472,8 @@ function renderNode(nd) {
             <span id="csm-${nd.i}" class="muted" style="font-size:0.84em"></span>
           </div>
         </div>
+        <hr style="margin:10px 0;opacity:.3">
+        <div style="margin:8px 0">${autoSection}</div>
       </div>`;
       }
 
@@ -1713,6 +1750,25 @@ function wireNodeEvents(box) {
       api.sendCmd(`CFG:SETLUXCALIB;node=${ni};lux_x100=${lux_x100}`);
       const msg = document.getElementById(`csm-${ni}`);
       if (msg) msg.textContent = 'Inviato, in attesa di conferma dal sensore...';
+      api.afterCmdRefresh();
+    });
+  });
+
+  // Misura automatica Light LC (come "Misura automatica" nell'app MeshProv/
+  // Silvair): pilota le lampade del gruppo del sensore su 4 livelli - vedi
+  // CFG:LUXAUTOCALIB/mesh_handler_node_auto_calibrate_lux. Manda gli indici
+  // nodo delle lampade del gruppo, calcolati qui in JS (il firmware non ha
+  // un concetto proprio di "lampade associate a questo sensore").
+  box.querySelectorAll('[data-act="lux-autocalib"]').forEach(el => {
+    el.addEventListener('click', () => {
+      const ni = parseInt(el.dataset.node);
+      const grpaddr = el.dataset.grpaddr;
+      const lampIdx = lastState.nodes
+        .filter((n) => n.grpaddr === grpaddr && (n.kind & 1))
+        .map((n) => n.i);
+      if (!lampIdx.length) return;
+      if (!confirm(`Le ${lampIdx.length} lampade del gruppo verranno pilotate automaticamente su 4 livelli per circa 20 secondi. Continuare?`)) return;
+      api.sendCmd(`CFG:LUXAUTOCALIB;sensor=${ni};lamps=${lampIdx.join(',')}`);
       api.afterCmdRefresh();
     });
   });

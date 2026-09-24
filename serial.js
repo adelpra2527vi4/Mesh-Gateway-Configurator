@@ -212,7 +212,7 @@ export class GatewaySerial extends EventTarget {
     // 'sniffer') e il rumore rendeva impossibile vedere a occhio le righe che
     // contano davvero (DBG;, CFG:OK/ERR, comandi mandati, push) durante un
     // provisioning che richiede minuti - vedi conversazione.
-    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], groups: [], discovered: [], discActive: false }; this._armTimer(); return; }
+    if (line === 'CFG:STATE_START') { this._stateAcc = { busy: false, oob: false, usbMode: false, nodes: [], groups: [], discovered: [], discActive: false, autocalib: { busy: false, result: -2, sensorAddr: null } }; this._armTimer(); return; }
     if (line === 'CFG:STATE_END') {
       this._clearBlockTimer();
       const st = this._stateAcc; this._stateAcc = null;
@@ -360,6 +360,20 @@ export class GatewaySerial extends EventTarget {
         if (node) node.luxcalib = {
           haslux: fields.haslux === '1',
           ref_x100: Number.isFinite(refX100) && refX100 >= 0 ? refX100 : null,
+        };
+        break;
+      }
+      case 'LUXAUTOCALIB': {
+        // Esito della misura automatica di calibrazione Light LC (vedi
+        // mesh_handler_emit_autocalib_status in mesh_handler.c) - una riga
+        // sola per l'intera mesh, non per-nodo, dato che l'operazione
+        // coinvolge più lampade insieme. result: -2 = mai eseguita in
+        // questa sessione, -1 = fallita, 1 = riuscita.
+        const result = parseInt(fields.result, 10);
+        st.autocalib = {
+          busy: fields.busy === '1',
+          result: Number.isFinite(result) ? result : -2,
+          sensorAddr: fields.sensor || null,
         };
         break;
       }
