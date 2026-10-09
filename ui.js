@@ -1095,8 +1095,69 @@ function renderDiscovered() {
         if (!confirm(`Questo dispositivo sembra gia' configurato come "${name}" ed e' caduto dalla rete mesh.\n\nRiprovisionarlo lo riconfigurera' da zero (gruppo/nome restano, ma andra' ribindato). Continuare?`)) return;
       }
       const d = list.find(x => x.uuid === b.dataset.uuid);
-      if (d) provisioningDevice = d;
-      api.sendCmd('CFG:PROVISION;uuid=' + b.dataset.uuid);
+      chooseProvisionGroup(d ? d.name : '').then(grp => {
+        if (grp === null) return; // annullato
+        if (d) provisioningDevice = d;
+        api.sendCmd('CFG:PROVISION;uuid=' + b.dataset.uuid + grp);
+      });
+    });
+  });
+}
+
+// Scelta del gruppo mesh in cui mettere il nodo appena provisionato (vedi
+// CFG:PROVISION;group=/gname= in cfg_protocol.c): risolve con il suffisso da
+// aggiungere al comando ('' = nessun gruppo) o null se annullato.
+function chooseProvisionGroup(devName) {
+  return new Promise(resolve => {
+    const groups = lastState.groups || [];
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const overlay = document.createElement('div');
+    overlay.className = 'qr-modal';
+    overlay.innerHTML = `
+      <div class="qr-modal-box">
+        <div class="qr-modal-head"><span>Gruppo${devName ? ' per ' + esc(devName) : ''}</span><button type="button" class="iconbtn" data-act="cancel">&times;</button></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <select id="pg-sel">
+            <option value="">Nessun gruppo</option>
+            ${groups.map(g => `<option value="${esc(g.addr)}">${esc(g.name || g.addr)}</option>`).join('')}
+            <option value="__new">+ Nuovo gruppo...</option>
+          </select>
+          <input id="pg-name" type="text" maxlength="23" placeholder="Nome nuovo gruppo" hidden>
+          <div class="muted" id="pg-err" style="color:var(--red)" hidden></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button type="button" class="btn sm" data-act="cancel">Annulla</button>
+            <button type="button" class="btn primary sm" data-act="ok">Provisiona</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const sel = overlay.querySelector('#pg-sel');
+    const name = overlay.querySelector('#pg-name');
+    const err = overlay.querySelector('#pg-err');
+    sel.addEventListener('change', () => {
+      name.hidden = sel.value !== '__new';
+      if (!name.hidden) name.focus();
+    });
+    const close = (val) => {
+      overlay.classList.add('qr-modal-closing');
+      overlay.querySelector('.qr-modal-box').addEventListener('animationend', () => overlay.remove(), { once: true });
+      resolve(val);
+    };
+    overlay.querySelectorAll('[data-act="cancel"]').forEach(x => x.addEventListener('click', () => close(null)));
+    overlay.querySelector('[data-act="ok"]').addEventListener('click', () => {
+      if (sel.value === '__new') {
+        const n = name.value.trim();
+        if (!n || /[;,:|]/.test(n)) {
+          err.textContent = 'Nome non valido (vuoto o con ; , : |)';
+          err.hidden = false;
+          return;
+        }
+        close(';gname=' + n);
+      } else if (sel.value) {
+        close(';group=' + sel.value.replace(/^0x/i, ''));
+      } else {
+        close('');
+      }
     });
   });
 }
