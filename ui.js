@@ -566,6 +566,11 @@ async function importMeshFromFile(file) {
 export function init(a) {
   api = a;
 
+  document.getElementById('btn-modeswitch').addEventListener('click', (e) => {
+    api.sendCmd('CFG:MODESET;active=' + e.currentTarget.dataset.next);
+    api.afterCmdRefresh(300);
+  });
+
   document.getElementById('btn-meshsave').addEventListener('click', () => {
     const m = document.getElementById('savemsg'); if (m) m.textContent = '...';
     api.sendCmd('CFG:MESHSAVE');
@@ -786,10 +791,19 @@ function renderUsbModeBanner(usbMode) {
   const dot = document.getElementById('conn-dot');
   if (dot) dot.classList.toggle('usbmode', !!usbMode);
 
+  // Pulsante virtuale (CFG:MODESET) al posto della pressione lunga su DIN_1.
+  const modeBtn = document.getElementById('btn-modeswitch');
+  if (modeBtn) {
+    modeBtn.hidden = false;
+    modeBtn.textContent = usbMode ? 'Esci da config' : 'Entra in config';
+    modeBtn.classList.toggle('primary', !usbMode);
+    modeBtn.dataset.next = usbMode ? '0' : '1';
+  }
+
   const banner = document.getElementById('banner');
   if (banner) {
     if (!usbMode) {
-      banner.textContent = 'Modalità MQTT attiva: tieni premuto BOOT sul gateway per passare a USB e sbloccare scan/provisioning/relè.';
+      banner.textContent = 'Modalità MQTT attiva: premi "Entra in config" (o tieni premuto il pulsante sul gateway) per sbloccare scan/provisioning/relè.';
       // fade-in-up solo alla vera comparsa (era gia' nascosto), non ad ogni
       // poll mentre resta visibile - altrimenti l'animazione "tremolerebbe".
       if (banner.style.display !== 'block') banner.classList.add('animate-fade-in-up');
