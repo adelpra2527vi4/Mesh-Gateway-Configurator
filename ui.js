@@ -34,13 +34,19 @@ function groupAvgLevel(addr) {
 // su un frame video catturato in canvas e funziona in qualsiasi browser
 // moderno, restando comunque un file locale (nessuna CDN a runtime, ok per
 // GitHub Pages offline).
-function openQrScanner(targetInputId) {
-  if (!targetInputId) return;
+// target: id del campo di testo da riempire (QR companion, un solo codice)
+// oppure { title, onCode(data, ui) } per letture su piu' fotogrammi (QR
+// animato dell'app MeshProv/GDSMesh): onCode riceve ogni codice letto e
+// restituisce true quando la lettura e' finita (lo scanner si chiude).
+function openQrScanner(target) {
+  if (!target) return;
+  const multi = typeof target === 'object';
+  const targetInputId = multi ? null : target;
   const overlay = document.createElement('div');
   overlay.className = 'qr-modal';
   overlay.innerHTML = `
     <div class="qr-modal-box">
-      <div class="qr-modal-head"><span>Inquadra il QR code</span><button type="button" class="iconbtn" id="qr-close">&times;</button></div>
+      <div class="qr-modal-head"><span>${multi && target.title ? target.title : 'Inquadra il QR code'}</span><button type="button" class="iconbtn" id="qr-close">&times;</button></div>
       <div class="qr-video-wrap">
         <video id="qr-video" autoplay playsinline muted></video>
         <button type="button" class="iconbtn qr-switch-btn" id="qr-switch" style="display:none" title="Cambia fotocamera"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 0 1 15-8.66"/><path d="M22 12a10 10 0 0 1-15 8.66"/><path d="M17 2v5h-5"/><path d="M7 22v-5h5"/></svg></button>
@@ -52,6 +58,7 @@ function openQrScanner(targetInputId) {
         </div>
       </div>
       <div class="muted" id="qr-status">Avvio fotocamera...</div>
+      <div class="qr-progress" id="qr-progress" hidden><div class="qr-progress-bar"><span id="qr-progress-fill"></span></div><div class="qr-progress-cells" id="qr-progress-cells"></div></div>
       <div class="qr-adjust-row">
         <label>Contrasto <span id="qr-contrast-val"></span></label>
         <input type="range" id="qr-contrast" min="0" max="250" step="5">
@@ -86,6 +93,23 @@ function openQrScanner(targetInputId) {
   const focusVal = overlay.querySelector('#qr-focus-val');
   let stream = null, rafId = null, stopped = false;
   let devices = [], devIdx = 0;
+  // Avanzamento della lettura multi-fotogramma: una cella per fotogramma,
+  // accesa quando quel pezzo e' arrivato (l'app li fa scorrere a ciclo,
+  // quelli persi ripassano da soli).
+  const scanUi = {
+    status: (t) => { status.textContent = t; },
+    progress: (got, total) => {
+      const box = overlay.querySelector('#qr-progress');
+      box.hidden = false;
+      overlay.querySelector('#qr-progress-fill').style.width = (total ? Math.round(got.size * 100 / total) : 0) + '%';
+      const cells = overlay.querySelector('#qr-progress-cells');
+      if (cells.childElementCount !== total) {
+        cells.innerHTML = '';
+        for (let i = 0; i < total; i++) cells.appendChild(document.createElement('span'));
+      }
+      [...cells.children].forEach((c, i) => c.classList.toggle('on', got.has(i)));
+    },
+  };
 
   // Contrasto/luminosita' regolabili a mano (prima erano fissi) e ricordati
   // tra una scansione e l'altra - un QR piccolo/stampato male puo' aver
@@ -271,7 +295,11 @@ function openQrScanner(targetInputId) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const code = jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' });
-          if (code && code.data) {
+          if (multi && code && code.data) {
+            let done = false;
+            try { done = target.onCode(code.data, scanUi); } catch (e) { console.error(e); }
+            if (done) { cleanup(); return; }
+          } else if (code && code.data) {
             // Rilettura per id, non riferimento catturato all'apertura: un
             // refresh periodico nel frattempo puo' aver ridisegnato
             // nodes-box e reso l'elemento vecchio "orfano" - scrivendoci
@@ -352,6 +380,77 @@ const IMPORT_MAX_ELEM_OFFSETS = 4; // NODE_META_MAX_ELEM lato firmware
 let importInProgress = false;
 
 async function importMeshFromFile(file) {
+  let text;
+  try {
+    text = await file.text();
+  } catch (e) {
+    alert('File non leggibile.');
+    return;
+  }
+  return importMeshFromText(text, 'Il file');
+}
+
+// QR animato dell'app Android (Progetti › Condividi › Mostra QR code, vedi
+// QrTransfer.kt): il JSON della rete gzip+base64, spezzato in pezzi da 400
+// caratteri, un QR per pezzo con il formato "MPQ1|sessione|indice|totale|pezzo"
+// (indice da 0). L'app li fa girare a ciclo: basta tenere inquadrato lo
+// schermo finche' non sono arrivati tutti, nell'ordine in cui capitano.
+const APP_QR_MAGIC = 'MPQ1';
+
+async function gunzipBase64(b64) {
+  const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const stream = new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(stream).text();
+}
+
+function importMeshFromAppQr() {
+  if (importInProgress) {
+    alert('Un import è già in corso, attendi che finisca prima di riprovare.');
+    return;
+  }
+  if (typeof DecompressionStream !== 'function') {
+    alert('Questo browser non supporta la lettura del QR dell\'app (serve Chrome/Edge recente). Usa "Importa rete da file".');
+    return;
+  }
+  let session = null, total = 0, parts = new Map(), finishing = false;
+  openQrScanner({
+    title: 'Inquadra il QR dell\'app',
+    onCode(data, scan) {
+      if (finishing) return false;
+      // QR con il JSON in chiaro (rete piccola o generato altrove): va bene uguale
+      if (data.trimStart().startsWith('{')) {
+        finishing = true;
+        setTimeout(() => importMeshFromText(data, 'Il QR'), 0);
+        return true;
+      }
+      const f = data.split('|');
+      if (f.length < 5 || f[0] !== APP_QR_MAGIC) {
+        scan.status('Questo non è il QR di condivisione dell\'app (Progetti › Condividi › Mostra QR code).');
+        return false;
+      }
+      const idx = parseInt(f[2], 10), tot = parseInt(f[3], 10);
+      const chunk = f.slice(4).join('|');
+      if (!Number.isInteger(idx) || !Number.isInteger(tot) || tot <= 0) return false;
+      // Nuova sessione (l'app ha riaperto il QR o cambiato rete): si riparte
+      if (session !== f[1]) { session = f[1]; total = tot; parts = new Map(); }
+      if (idx >= 0 && idx < total) parts.set(idx, chunk);
+      scan.progress(new Set(parts.keys()), total);
+      if (parts.size < total) {
+        scan.status(`Ricevuti ${parts.size} di ${total} pezzi - tieni inquadrato lo schermo del telefono`);
+        return false;
+      }
+      finishing = true;
+      scan.status('Ricevuto tutto, decompressione...');
+      const b64 = [...Array(total).keys()].map((i) => parts.get(i)).join('');
+      gunzipBase64(b64)
+        .then((json) => importMeshFromText(json, 'Il QR'))
+        .catch(() => alert('QR letto ma il contenuto è danneggiato: riprova (o usa "Lento" sull\'app).'));
+      return true;
+    },
+  });
+}
+
+async function importMeshFromText(text, sourceLabel) {
   if (importInProgress) {
     alert('Un import è già in corso, attendi che finisca prima di riprovare.');
     return;
@@ -362,10 +461,13 @@ async function importMeshFromFile(file) {
 
   let data;
   try {
-    const text = await file.text();
     data = JSON.parse(text);
   } catch (e) {
-    alert('File non leggibile o non è un JSON valido.');
+    alert(`${sourceLabel} non contiene un JSON valido.`);
+    return;
+  }
+  if (data && data.format === 'meshprov-scene') {
+    alert('Questa è una scena dell\'app, non una rete: qui si importano solo reti intere (Progetti › Condividi).');
     return;
   }
 
@@ -642,6 +744,7 @@ export function init(a) {
     ev.target.value = ''; // permette di riselezionare lo stesso file una seconda volta
     if (file) importMeshFromFile(file);
   });
+  document.getElementById('importqrbtn').addEventListener('click', importMeshFromAppQr);
 
   document.getElementById('sniffbtn').addEventListener('click', toggleSniffer);
   document.getElementById('sniffclearbtn').addEventListener('click', () => {
@@ -780,7 +883,7 @@ export function renderState(state) {
 // banner e disabilitiamo i pulsanti che lancerebbero comandi di scrittura,
 // cosi' l'utente capisce perche' non succede nulla invece di vedere solo
 // errori in log.
-const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-factory-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn', 'importbtn'];
+const WRITE_BTN_IDS = ['btn-meshsave', 'btn-reset', 'btn-factory-reset', 'btn-sethubname', 'btn-resetallsensors', 'sniffbtn', 'discbtn', 'importbtn', 'importqrbtn'];
 
 function renderUsbModeBanner(usbMode) {
   // Il pallino accanto al titolo rispecchia il colore del LED fisico

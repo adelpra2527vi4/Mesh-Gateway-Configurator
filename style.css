@@ -609,6 +609,12 @@ details[open] summary::before{content:'\25BE '}
 .qr-modal-head #qr-close:hover{transform:rotate(90deg);color:var(--red);border-color:var(--red)}
 .qr-modal video{width:100%;border-radius:8px;background:#000;aspect-ratio:1/1;object-fit:cover;display:block}
 .qr-modal .muted{margin-top:8px;text-align:center}
+.qr-progress{margin-top:8px}
+.qr-progress-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden}
+.qr-progress-bar span{display:block;height:100%;width:0;background:var(--accent-text);transition:width .2s ease}
+.qr-progress-cells{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;justify-content:center}
+.qr-progress-cells span{width:10px;height:10px;border-radius:2px;background:var(--border);transition:background .2s}
+.qr-progress-cells span.on{background:var(--accent-text)}
 .qr-adjust-row{margin-top:10px;font-size:.82rem}
 .qr-adjust-row label{display:flex;justify-content:space-between;color:var(--muted);margin-bottom:3px}
 .qr-adjust-row input[type="range"]{margin:0;padding:0;width:100%;border:none;accent-color:var(--accent-text)}
